@@ -1,0 +1,49 @@
+{
+  "catalogVersion": 2,
+  "name": "gino8080 Orca plugins",
+  "owner": "gino8080",
+  "plugins": [
+    {
+      "id": "gino8080.git-overview",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/gino8080/orca-git-overview.git",
+        "ref": "main"
+      },
+      "description": "Git status, branches, commit graph and file history for every repository in the active workspace folder, in one panel.",
+      "categories": ["git"],
+      "releases": [
+        {
+          "version": "0.1.0",
+          "commit": "af24572eceda15fc799c4461f7824ba1200b3603",
+          "contentHash": "e5f8a72c2046d49f4e0c35300bb3e14c13a91df48d3960f7186f93243584b970",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Multi-Repo Git Overview",
+          "contributes": [
+            { "kind": "panels", "name": "Git Overview" },
+            { "kind": "customEditors", "name": "Git Diff", "detail": ".gitdiff" },
+            { "kind": "statusBarItems", "name": "Git Overview" }
+          ],
+          "capabilities": [
+            "storage:own",
+            "workspace:read",
+            "workspace:write",
+            "settings:own"
+          ],
+          "fileTypes": ["gitdiff"],
+          "editorFileTypes": ["gitdiff"],
+          "images": {
+            "icon": {
+              "path": "assets/icon.png",
+              "alt": "Multi-Repo Git Overview",
+              "sha256": "5d3725cbb02cacde4468d7e2a3711861b2b1fd24740743d7ab6eda5c250b4c44",
+              "width": 512,
+              "height": 512
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
