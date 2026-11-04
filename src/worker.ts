@@ -198,6 +198,16 @@ async function resolveRoot(
   return { root: fallback, source: 'setting' };
 }
 
+/** Riga utile di un errore di git: la prima `fatal:`/`error:` (senza prefisso), altrimenti l'ultima non vuota. */
+export function gitErrorLine(message: string): string {
+  const lines = message
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const hit = lines.find((l) => /^(fatal|error):/i.test(l));
+  return (hit ? hit.replace(/^(fatal|error):\s*/i, '') : lines.at(-1)) ?? '';
+}
+
 export function parseFiles(out: string): ChangedFile[] {
   const files: ChangedFile[] = [];
   for (const line of out.split('\n')) {
@@ -502,7 +512,7 @@ export default function activate(orca: OrcaWorkerApi): void {
         git(join(root, n), ['fetch', '--quiet', '--no-tags']).catch((e: Error) => {
           failed.push({
             name: n,
-            error: String(e.message).trim().split('\n').slice(-1)[0],
+            error: gitErrorLine(String(e.message)),
           });
         }),
       ),

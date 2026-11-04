@@ -546,7 +546,11 @@ function repoRow(r: RepoStatus): HTMLElement {
       : h(
           'div',
           { class: 'desc frow' },
-          h('span', { class: 'mono branch' }, r.branch),
+          h(
+            'span',
+            { class: 'mono branch', title: r.detached ? t('detached') : r.branch },
+            r.detached ? t('detached') : r.branch,
+          ),
           ...repoPills(r),
           !r.upstream && !r.detached && h('span', { class: 'dim' }, t('noUpstream')),
           r.stash > 0 && h('span', { class: 'dim' }, `stash ${r.stash}`),
@@ -1323,6 +1327,7 @@ hr { width:100%; border:0; border-top:1px solid var(--line); margin:2px 0 }
 .d-danger { background:#f0705f } .d-err { background:transparent; border:1.5px solid #f0705f; box-sizing:border-box }
 .arrows { flex:none; font:11.5px ui-monospace,monospace; color:var(--dim) } .branch { color:var(--orca-foreground); opacity:.85 }
 .err-text { color:#f0705f }
+.branch { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .pill { flex:none; font:11px ui-monospace,monospace; padding:0 6px; border-radius:8px; background:var(--hover) }
 .p-ok { color:#73c991 } .p-warn { color:#e2c08d } .p-danger { color:#f0705f } .p-dim { color:var(--dim) }
 .ficon { flex:none; display:inline-flex } .ficon svg { display:block }
