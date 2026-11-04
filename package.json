@@ -1,7 +1,7 @@
 {
   "name": "orca-git-overview",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Orca plugin: git status, branches, commit graph and file history for every repo in the active workspace folder.",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
