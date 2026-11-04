@@ -11,8 +11,70 @@
         "ref": "main"
       },
       "description": "Git status, branches, commit graph and file history for every repository in the active workspace folder, in one panel.",
-      "categories": ["git"],
+      "categories": [
+        "git"
+      ],
       "releases": [
+        {
+          "version": "0.1.2",
+          "commit": "8167207b5e86c797850bef6bc22003a8e31799d3",
+          "contentHash": "0b70d000757c11655d657ae86409235e7ed47034cafb83c1c0d420f4067a8e54",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Multi-Repo Git Overview",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "Git Overview"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Git Diff",
+              "detail": ".gitdiff"
+            },
+            {
+              "kind": "statusBarItems",
+              "name": "Git Overview"
+            }
+          ],
+          "capabilities": [
+            "storage:own",
+            "workspace:read",
+            "workspace:write",
+            "settings:own"
+          ],
+          "fileTypes": [
+            "gitdiff"
+          ],
+          "editorFileTypes": [
+            "gitdiff"
+          ],
+          "images": {
+            "icon": {
+              "path": "assets/icon.png",
+              "alt": "Multi-Repo Git Overview",
+              "sha256": "5d3725cbb02cacde4468d7e2a3711861b2b1fd24740743d7ab6eda5c250b4c44",
+              "width": 512,
+              "height": 512
+            },
+            "cover": {
+              "path": "assets/cover.png",
+              "alt": "Multi-Repo Git Overview: status, branches and commit graph of every repository, in dark and light theme",
+              "sha256": "3584e36dc4f3adc791030c52ceca10f34ee07249bc91be1fac44f06f1d40105f",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/screenshot-graph.png",
+                "alt": "Panel listing five repositories with their status, and the commit graph of one repository with a commit's changed files",
+                "sha256": "51f3519b17bdf2a0fb33172191a5371c0eb0792f21451e126f7a4da3792953bf",
+                "width": 1616,
+                "height": 1010
+              }
+            ]
+          }
+        },
         {
           "version": "0.1.1",
           "commit": "952fac90ea93e5056708ea13e8ca81a095d2a455",
@@ -41,8 +103,12 @@
             "workspace:write",
             "settings:own"
           ],
-          "fileTypes": ["gitdiff"],
-          "editorFileTypes": ["gitdiff"],
+          "fileTypes": [
+            "gitdiff"
+          ],
+          "editorFileTypes": [
+            "gitdiff"
+          ],
           "images": {
             "icon": {
               "path": "assets/icon.png",
@@ -97,8 +163,12 @@
             "workspace:write",
             "settings:own"
           ],
-          "fileTypes": ["gitdiff"],
-          "editorFileTypes": ["gitdiff"],
+          "fileTypes": [
+            "gitdiff"
+          ],
+          "editorFileTypes": [
+            "gitdiff"
+          ],
           "images": {
             "icon": {
               "path": "assets/icon.png",
