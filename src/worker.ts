@@ -1,5 +1,14 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { delimiter, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { OrcaWorkerApi } from 'orca/worker';
@@ -613,6 +622,19 @@ export default function activate(orca: OrcaWorkerApi): void {
 
   /** Nome fisso: un solo tab "anteprima" per repo, riusato (e aggiornato) a ogni diff. */
   const PREVIEW = 'anteprima.gitdiff';
+  const PREVIEW_DIR = '.orca-overview';
+
+  /** Aggiunge `pattern` a `.git/info/exclude` (solo locale, mai versionato) se manca. */
+  async function excludeFromGit(gitDir: string, pattern: string): Promise<void> {
+    const file = join(gitDir, 'info', 'exclude');
+    const current = await readFile(file, 'utf8').catch(() => '');
+    if (current.split('\n').includes(pattern)) return;
+    await mkdir(join(gitDir, 'info'), { recursive: true });
+    await appendFile(
+      file,
+      `${current && !current.endsWith('\n') ? '\n' : ''}${pattern}\n`,
+    );
+  }
 
   /** Scrive il diff nel file di anteprima e lo apre nel tab centrale del workspace del repo. */
   async function showPreview(
@@ -623,7 +645,10 @@ export default function activate(orca: OrcaWorkerApi): void {
     const gitDir = join(path, '.git');
     if (!(await stat(gitDir)).isDirectory())
       return { opened: false, reason: 'git-not-dir' };
-    const dir = join(gitDir, 'orca-overview');
+    // Fuori da `.git`: il watcher di Orca ignora quella cartella, quindi un tab già aperto
+    // non vedrebbe le riscritture. La cartella è esclusa da git via `.git/info/exclude`.
+    const dir = join(path, PREVIEW_DIR);
+    await excludeFromGit(gitDir, `/${PREVIEW_DIR}/`);
     await mkdir(dir, { recursive: true });
     // Pulizia dei file temporanei vecchi di oltre un'ora (escluso quello d'anteprima).
     for (const f of await readdir(dir)) {
@@ -640,7 +665,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     await orca.host.call('workspace.open', { workspaceId: m.ws.id });
     await orca.host.call('editor.open', {
       workspaceId: m.ws.id,
-      path: inWorkspace(m, `.git/orca-overview/${PREVIEW}`),
+      path: inWorkspace(m, `${PREVIEW_DIR}/${PREVIEW}`),
     });
     return { opened: true };
   }
