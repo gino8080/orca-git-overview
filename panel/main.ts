@@ -228,8 +228,22 @@ async function loadFiles(path: string): Promise<void> {
   render();
 }
 
+/** Salva repo selezionato, scroll e sezioni chiuse: il pannello viene ricreato al cambio tab di Orca. */
+let saveTimer: number | undefined;
+function saveView(): void {
+  clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    void orca.storage.set('view', {
+      selected: S.selected,
+      scroll: app.scrollTop,
+      closed: [...S.closed],
+    });
+  }, 250);
+}
+
 async function select(path: string): Promise<void> {
   resetDetail(path);
+  saveView();
   render();
   void loadFiles(path);
   if (S.tab === 'graph') void loadGraph(path);
@@ -514,6 +528,7 @@ function section(
   d.addEventListener('toggle', () => {
     if (d.open !== openByDefault) S.closed.add(key);
     else S.closed.delete(key);
+    saveView();
   });
   return d;
 }
@@ -1209,6 +1224,8 @@ function applyColorScheme(): void {
   document.documentElement.style.colorScheme = lum < 0.5 ? 'dark' : 'light';
 }
 
+let restoreScroll: number | null = null;
+
 function render(): void {
   hideTip();
   const scroll = app.scrollTop;
@@ -1261,6 +1278,11 @@ function render(): void {
   ];
   app.replaceChildren(...parts.filter((c): c is Node => !!c));
   app.scrollTop = scroll;
+  // Ripristino dello scroll salvato: il contenuto cresce man mano che arrivano i file, quindi si riapplica finché non ha finito.
+  if (restoreScroll !== null) {
+    app.scrollTop = restoreScroll;
+    if (!S.filesLoading) restoreScroll = null;
+  }
 }
 
 // Tooltip proprio: il `title` nativo non compare nel pannello di Orca. Delega su qualunque [title].
@@ -1383,8 +1405,19 @@ void (async () => {
   t = makeT(lang);
   const pr = await orca.storage.get('paneR');
   if (typeof pr === 'number' && pr >= 0.1 && pr <= 0.9) S.paneR = pr;
+  const view = (await orca.storage.get('view')) as {
+    selected?: string | null;
+    scroll?: number;
+    closed?: string[];
+  } | null;
+  if (Array.isArray(view?.closed)) S.closed = new Set(view.closed);
   render();
-  void refresh();
+  await refresh();
+  if (view?.selected && S.repos.some((r) => r.path === view.selected)) {
+    if (typeof view.scroll === 'number') restoreScroll = view.scroll;
+    await select(view.selected);
+  }
+  app.addEventListener('scroll', saveView);
   orca.on('workspace.changed', () => void refresh());
   const sec = await orca.settings.get('refreshSeconds');
   if (typeof sec === 'number' && sec > 0) setInterval(() => void refresh(), sec * 1000);
