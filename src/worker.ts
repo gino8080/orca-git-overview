@@ -18,6 +18,7 @@ import { statusBarState, summarize } from '../shared/summary';
 import type {
   Branch,
   ChangedFile,
+  FetchResult,
   FileCommit,
   FileEntry,
   FileGroup,
@@ -347,7 +348,11 @@ async function cappedDiff(
   cwd: string,
   args: string[],
 ): Promise<{ diff: string; truncated: boolean }> {
-  const full = await gitDiff(cwd, ['-c', 'core.quotepath=false', ...args]);
+  return capDiff(await gitDiff(cwd, ['-c', 'core.quotepath=false', ...args]));
+}
+
+/** Tronca il diff a MAX_DIFF caratteri e segnala se è successo. */
+export function capDiff(full: string): { diff: string; truncated: boolean } {
   const truncated = full.length > MAX_DIFF;
   return { diff: truncated ? full.slice(0, MAX_DIFF) : full, truncated };
 }
@@ -506,19 +511,16 @@ export default function activate(orca: OrcaWorkerApi): void {
     const t0 = Date.now();
     const { root } = await resolveRoot(orca);
     const names = await repoNames(root);
-    const failed: { name: string; error: string }[] = [];
-    await Promise.all(
-      names.map((n) =>
-        git(join(root, n), ['fetch', '--quiet', '--no-tags']).catch((e: Error) => {
-          failed.push({
-            name: n,
-            error: gitErrorLine(String(e.message)),
-          });
-        }),
+    const results: FetchResult[] = await Promise.all(
+      names.map((name) =>
+        git(join(root, name), ['fetch', '--quiet', '--no-tags']).then(
+          () => ({ name }),
+          (e: Error) => ({ name, error: gitErrorLine(String(e.message)) }),
+        ),
       ),
     );
     void updateStatusBar();
-    return { total: names.length, failed, tookMs: Date.now() - t0 };
+    return { total: names.length, results, tookMs: Date.now() - t0 };
   });
 
   async function scanRepos(): Promise<{
@@ -688,14 +690,17 @@ export default function activate(orca: OrcaWorkerApi): void {
       const ws = await findWorkspace(path);
       if (!ws) return { opened: false, reason: 'no-workspace' as const };
       if (hash) {
-        const { diff } = await cappedDiff(path, commitDiffArgs(hash, file, origFile));
-        return showPreview(path, ws, { title: hash.slice(0, 10), file, diff });
+        const { diff, truncated } = await cappedDiff(
+          path,
+          commitDiffArgs(hash, file, origFile),
+        );
+        return showPreview(path, ws, { title: hash.slice(0, 10), file, diff, truncated });
       }
       if (engine === 'native' && (await nativeDiff(path, file, group)) === 'ok')
         return { opened: true };
       if (group === 'untracked') await assertInside(path, file);
-      const { diff } = await cappedDiff(path, diffArgs(file, group));
-      return showPreview(path, ws, { title: group, file, diff });
+      const { diff, truncated } = await cappedDiff(path, diffArgs(file, group));
+      return showPreview(path, ws, { title: group, file, diff, truncated });
     },
   );
 

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   assertHash,
   assertRel,
+  capDiff,
   clampLimit,
   gitErrorLine,
   parseBranches,
@@ -150,4 +151,11 @@ test("gitErrorLine: prende la riga fatal, non l'ultima del suggerimento", () => 
   assert.equal(gitErrorLine(msg), "'/x/y.git' does not appear to be a git repository");
   assert.equal(gitErrorLine('boom\n\nultima riga\n'), 'ultima riga');
   assert.equal(gitErrorLine(''), '');
+});
+
+test('capDiff: sotto il limite non tronca, sopra sì e lo segnala', () => {
+  assert.deepEqual(capDiff('abc'), { diff: 'abc', truncated: false });
+  const big = capDiff('x'.repeat(400_001));
+  assert.equal(big.truncated, true);
+  assert.equal(big.diff.length, 400_000);
 });

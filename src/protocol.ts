@@ -18,6 +18,12 @@ export interface RepoStatus {
   error?: string;
 }
 
+/** Esito del fetch di un repo: `error` assente = riuscito. */
+export interface FetchResult {
+  name: string;
+  error?: string;
+}
+
 /** Motivo per cui un'apertura nel workspace non è riuscita (il pannello lo traduce). */
 export type OpenFailure = 'no-workspace' | 'git-not-dir';
 
@@ -86,7 +92,8 @@ declare module 'orca' {
     'repos.fetch': {
       output: {
         total: number;
-        failed: { name: string; error: string }[];
+        /** Un esito per repo, nell'ordine di scansione; `error` assente = riuscito. */
+        results: FetchResult[];
         tookMs: number;
       };
     };

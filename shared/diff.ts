@@ -3,6 +3,8 @@ export interface DiffPayload {
   title: string
   file: string
   diff: string
+  /** Il worker ha tagliato il diff al limite (400 KB): va detto all'utente. */
+  truncated?: boolean
   /** Lingua dei testi dell'editor (l'editor isolato non legge i setting). */
   lang?: Lang
 }
@@ -96,6 +98,7 @@ tr.del td.nw, tr.add td.o { background:rgba(128,128,128,.10) }
 tr.fold td { text-align:center; padding:2px; cursor:pointer; opacity:.7; background:rgba(128,128,128,.12) }
 tr.fold:hover td { opacity:1 }
 .msg { padding:16px; opacity:.7 }
+.msg.warn { opacity:1; padding:8px 16px; background:rgba(210,153,34,.2) }
 `
 
 function cell(cls: string, text: string): HTMLTableCellElement {
@@ -148,6 +151,12 @@ export function renderDiff(root: HTMLElement, p: DiffPayload, mode: DiffMode = '
   a.textContent = `+${added}`
   d.textContent = `-${deleted}`
   root.append(head)
+  if (p.truncated) {
+    const w = document.createElement('div')
+    w.className = 'msg warn'
+    w.textContent = t('diffTruncated')
+    root.append(w)
+  }
   if (binary || rows.length === 0) {
     const m = document.createElement('div')
     m.className = 'msg'

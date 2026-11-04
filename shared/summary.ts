@@ -1,5 +1,5 @@
 // Riepilogo di un gruppo di repo: lo usano il pannello (barra in testa) e il worker (status bar).
-import type { RepoStatus } from '../src/protocol';
+import type { FetchResult, RepoStatus } from '../src/protocol';
 import type { Translate } from './i18n';
 
 export const dirtyCount = (r: RepoStatus): number =>
@@ -17,6 +17,42 @@ export interface Summary {
   conflicts: number;
   /** Repo che git non ha saputo leggere. */
   errors: number;
+  /** Branch distinti fra i repo leggibili (HEAD staccato conta come uno a parte): >1 = gruppo non allineato. */
+  branches: number;
+}
+
+/** Repo leggibili raggruppati per branch (HEAD staccato in un gruppo a sé), il più numeroso prima. */
+export function branchGroups(
+  repos: RepoStatus[],
+): { branch: string; detached: boolean; repos: string[] }[] {
+  const groups = new Map<
+    string,
+    { branch: string; detached: boolean; repos: string[] }
+  >();
+  for (const r of repos) {
+    if (r.error) continue;
+    const key = r.detached ? '\0detached' : r.branch;
+    const g = groups.get(key) ?? { branch: r.branch, detached: r.detached, repos: [] };
+    g.repos.push(r.name);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort(
+    (a, b) => b.repos.length - a.repos.length || a.branch.localeCompare(b.branch),
+  );
+}
+
+/** Testo multilinea con l'esito del fetch di ogni repo: intestazione + una riga per repo. */
+export function fetchReport(
+  results: FetchResult[],
+  tookMs: number,
+  t: Translate,
+): string {
+  const failed = results.filter((r) => r.error);
+  const head = failed.length
+    ? t('fetchFailed', { n: failed.length, total: results.length })
+    : t('fetchOk', { total: results.length, ms: tookMs });
+  const lines = results.map((r) => (r.error ? `✗ ${r.name}: ${r.error}` : `✓ ${r.name}`));
+  return [head, ...lines].join('\n');
 }
 
 export function summarize(repos: RepoStatus[]): Summary {
@@ -27,6 +63,7 @@ export function summarize(repos: RepoStatus[]): Summary {
     ahead: 0,
     conflicts: 0,
     errors: 0,
+    branches: branchGroups(repos).length,
   };
   for (const r of repos) {
     if (r.error) {

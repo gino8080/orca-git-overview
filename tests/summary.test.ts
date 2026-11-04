@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { makeT } from '../shared/i18n';
-import { statusBarState, summarize } from '../shared/summary';
+import { branchGroups, fetchReport, statusBarState, summarize } from '../shared/summary';
 import type { RepoStatus } from '../src/protocol';
 
 const repo = (over: Partial<RepoStatus> = {}): RepoStatus => ({
@@ -37,6 +37,7 @@ test('summarize: conta repo sporchi, indietro, avanti, conflitti ed errori', () 
     ahead: 1,
     conflicts: 1,
     errors: 1,
+    branches: 1,
   });
 });
 
@@ -66,6 +67,36 @@ test('statusBarState: testo entro i 64 caratteri di Orca', () => {
     ahead: 0,
     conflicts: 999,
     errors: 999,
+    branches: 1,
   };
   assert.ok(statusBarState(s, makeT('it')).text.length <= 64);
+});
+
+test('branchGroups: raggruppa per branch, HEAD staccato a parte, errori esclusi', () => {
+  const groups = branchGroups([
+    repo({ name: 'a' }),
+    repo({ name: 'b', branch: 'develop' }),
+    repo({ name: 'c' }),
+    repo({ name: 'd', branch: 'main', detached: true }),
+    repo({ name: 'e', branch: 'x', error: 'boom' }),
+  ]);
+  assert.deepEqual(groups, [
+    { branch: 'main', detached: false, repos: ['a', 'c'] },
+    { branch: 'develop', detached: false, repos: ['b'] },
+    { branch: 'main', detached: true, repos: ['d'] },
+  ]);
+  assert.equal(summarize([repo(), repo({ name: 'b', branch: 'dev' })]).branches, 2);
+  assert.equal(summarize([repo(), repo({ name: 'b' })]).branches, 1);
+});
+
+test('fetchReport: una riga per repo, con esito e errore', () => {
+  const t = makeT('en');
+  assert.equal(
+    fetchReport([{ name: 'a' }, { name: 'b' }], 12, t),
+    'Fetch ok on 2 repos in 12 ms\n✓ a\n✓ b',
+  );
+  assert.equal(
+    fetchReport([{ name: 'a' }, { name: 'b', error: 'no remote' }], 5, t),
+    'Fetch failed on 1 of 2\n✓ a\n✗ b: no remote',
+  );
 });

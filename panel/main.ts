@@ -8,7 +8,7 @@ import {
   type Lang,
   type Translate,
 } from '../shared/i18n';
-import { dirtyCount, summarize } from '../shared/summary';
+import { branchGroups, dirtyCount, fetchReport, summarize } from '../shared/summary';
 import type {
   Branch,
   ChangedFile,
@@ -440,15 +440,7 @@ async function fetchAll(): Promise<void> {
   render();
   const r = await call('Fetch', 'repos.fetch', undefined, 120000);
   if (r) {
-    S.note = r.failed.length
-      ? t('fetchFailed', {
-          n: r.failed.length,
-          total: r.total,
-          repos: r.failed
-            .map((f: { name: string; error: string }) => `${f.name}: ${f.error}`)
-            .join('\n'),
-        })
-      : t('fetchOk', { total: r.total, ms: r.tookMs });
+    S.note = fetchReport(r.results, r.tookMs, t);
   }
   await refresh();
 }
@@ -602,6 +594,19 @@ function viewSummary(): HTMLElement {
   if (s.behind)
     chips.push(h('span', { class: 'chip c-info' }, t('sumBehind', { n: s.behind })));
   if (s.ahead) chips.push(h('span', { class: 'chip' }, t('sumAhead', { n: s.ahead })));
+  if (s.branches > 1)
+    chips.push(
+      h(
+        'span',
+        {
+          class: 'chip c-info',
+          title: branchGroups(S.repos)
+            .map((g) => `${g.detached ? t('detached') : g.branch}: ${g.repos.join(', ')}`)
+            .join('\n'),
+        },
+        t('sumBranches', { n: s.branches }),
+      ),
+    );
   if (s.total > 0 && !s.errors && !s.conflicts && !s.dirty && !s.behind)
     chips.push(h('span', { class: 'chip c-ok' }, t('sumClean')));
   return h(

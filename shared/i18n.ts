@@ -30,7 +30,7 @@ const en = {
   openingDiff: 'Opening diff...',
   diffNotOpened: 'Diff not opened',
   fetchRunning: 'Fetch in progress...',
-  fetchFailed: 'Fetch failed on {n} of {total}:\n{repos}',
+  fetchFailed: 'Fetch failed on {n} of {total}',
   fetchOk: 'Fetch ok on {total} repos in {ms} ms',
   fetchOk1: 'Fetch ok on 1 repo in {ms} ms',
   // riepilogo e status bar
@@ -42,6 +42,7 @@ const en = {
   sumConflicts: '{n} in conflict',
   sumErrors: '{n} unreadable',
   sumClean: 'all clean',
+  sumBranches: 'on {n} different branches',
   sbNone: 'no repos',
   sbClean: '{n} repos clean',
   sbClean1: '1 repo clean',
@@ -109,6 +110,7 @@ const en = {
   diffInvalid: 'Invalid file',
   diffBinary: 'Binary file: no text diff.',
   diffNone: 'No textual differences.',
+  diffTruncated: 'Diff too large: showing only the first 400 KB, the rest is omitted.',
   diffFold: '··· {n} unchanged lines ···',
 };
 
@@ -140,7 +142,7 @@ const it: Record<Key, string> = {
   openingDiff: 'Apro il diff...',
   diffNotOpened: 'Diff non aperto',
   fetchRunning: 'Fetch in corso...',
-  fetchFailed: 'Fetch fallito su {n} di {total}:\n{repos}',
+  fetchFailed: 'Fetch fallito su {n} di {total}',
   fetchOk: 'Fetch ok su {total} repo in {ms} ms',
   fetchOk1: 'Fetch ok su 1 repo in {ms} ms',
   sumRepos: '{n} repo',
@@ -151,6 +153,7 @@ const it: Record<Key, string> = {
   sumConflicts: '{n} in conflitto',
   sumErrors: '{n} illeggibili',
   sumClean: 'tutti puliti',
+  sumBranches: 'su {n} branch diversi',
   sbNone: 'nessun repo',
   sbClean: '{n} repo puliti',
   sbClean1: '1 repo pulito',
@@ -212,6 +215,7 @@ const it: Record<Key, string> = {
   diffInvalid: 'File non valido',
   diffBinary: 'File binario: nessun diff testuale.',
   diffNone: 'Nessuna differenza testuale.',
+  diffTruncated: 'Diff troppo grande: mostrati solo i primi 400 KB, il resto è omesso.',
   diffFold: '··· {n} righe invariate ···',
 };
 
