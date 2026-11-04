@@ -7,18 +7,21 @@ const en = {
   reasonNoWorkspace: 'No Orca workspace registered for {path}',
   reasonGitNotDir: '.git is not a directory (linked worktree?)',
   sourceWorkspace: 'active workspace: {name}',
+  sourceParent: 'parent folder of the active workspace: {name}',
   sourceSetting: 'rootDir setting',
   // generali
   loading: 'Loading...',
   cancel: 'Cancel',
   errorPrefix: 'error: {msg}',
   nFiles: '{n} files',
+  nFiles1: '1 file',
   nRepos: '{n} repos · {ms} ms',
+  nRepos1: '1 repo · {ms} ms',
   noRepos: 'No repositories. Check the container folder in the plugin settings.',
   pickRepo: 'Select a repo to see changes, branches and history.',
   onlyDirty: 'Only with changes',
   tipRefresh: 'Refresh',
-  tipFetch: 'Fetch: git fetch on all repos (writes remote refs)',
+  tipFetch: 'Fetch every repo in {group} ({n}): git fetch, writes remote refs',
   tipOpenWorkspace: 'Open the repo workspace',
   // azioni e messaggi
   lblDiff: 'Diff',
@@ -27,8 +30,27 @@ const en = {
   openingDiff: 'Opening diff...',
   diffNotOpened: 'Diff not opened',
   fetchRunning: 'Fetch in progress...',
-  fetchFailed: 'Fetch failed: {repos}',
-  fetchOk: 'Fetch ok in {ms} ms',
+  fetchFailed: 'Fetch failed on {n} of {total}:\n{repos}',
+  fetchOk: 'Fetch ok on {total} repos in {ms} ms',
+  fetchOk1: 'Fetch ok on 1 repo in {ms} ms',
+  // riepilogo e status bar
+  sumRepos: '{n} repos',
+  sumRepos1: '1 repo',
+  sumDirty: '{n} with changes',
+  sumBehind: '{n} behind',
+  sumAhead: '{n} ahead',
+  sumConflicts: '{n} in conflict',
+  sumErrors: '{n} unreadable',
+  sumClean: 'all clean',
+  sbNone: 'no repos',
+  sbClean: '{n} repos clean',
+  sbClean1: '1 repo clean',
+  sbDirty: '{n} with changes',
+  sbBehind: '{n} behind',
+  sbConflicts: '{n} in conflict',
+  sbErrors: '{n} unreadable',
+  sbTip: 'Git Overview: state of the repos in the active workspace folder',
+  tipRootDir: 'Scanned folder: {root} ({source})',
   switchRunning: 'Switching...',
   switchedTo: 'Now on {name}',
   switchFailed: 'switch failed',
@@ -67,8 +89,8 @@ const en = {
   // branch
   current: 'current',
   switchTo: 'Switch to {name}?',
-  localBranches: 'Local ({n})',
-  remoteBranches: 'Remote ({n})',
+  localBranches: 'Local',
+  remoteBranches: 'Remote',
   remotesHint: 'Remotes are the ones already known locally: use Fetch to update them.',
   // grafo
   tipBranchSel: 'Branch to show',
@@ -86,27 +108,30 @@ const en = {
   diffInvalid: 'Invalid file',
   diffBinary: 'Binary file: no text diff.',
   diffNone: 'No textual differences.',
-  diffFold: '··· {n} unchanged lines ···'
-}
+  diffFold: '··· {n} unchanged lines ···',
+};
 
-export type Key = keyof typeof en
-export type Lang = 'en' | 'it'
+export type Key = keyof typeof en;
+export type Lang = 'en' | 'it';
 
 const it: Record<Key, string> = {
   reasonNoWorkspace: 'Nessun workspace Orca registrato per {path}',
   reasonGitNotDir: '.git non è una cartella (worktree collegato?)',
   sourceWorkspace: 'workspace attivo: {name}',
+  sourceParent: 'cartella madre del workspace attivo: {name}',
   sourceSetting: 'setting rootDir',
   loading: 'Carico...',
   cancel: 'Annulla',
   errorPrefix: 'errore: {msg}',
   nFiles: '{n} file',
+  nFiles1: '1 file',
   nRepos: '{n} repo · {ms} ms',
+  nRepos1: '1 repo · {ms} ms',
   noRepos: 'Nessun repo. Controlla la cartella nei setting del plugin.',
   pickRepo: 'Seleziona un repo per vedere modifiche, branch e storico.',
   onlyDirty: 'Solo con modifiche',
   tipRefresh: 'Aggiorna',
-  tipFetch: 'Fetch: git fetch su tutti i repo (scrive i riferimenti remoti)',
+  tipFetch: 'Fetch di ogni repo in {group} ({n}): git fetch, scrive i riferimenti remoti',
   tipOpenWorkspace: 'Apri il workspace del repo',
   lblDiff: 'Diff',
   lblOpenFile: 'Apri file',
@@ -114,8 +139,26 @@ const it: Record<Key, string> = {
   openingDiff: 'Apro il diff...',
   diffNotOpened: 'Diff non aperto',
   fetchRunning: 'Fetch in corso...',
-  fetchFailed: 'Fetch fallito: {repos}',
-  fetchOk: 'Fetch ok in {ms} ms',
+  fetchFailed: 'Fetch fallito su {n} di {total}:\n{repos}',
+  fetchOk: 'Fetch ok su {total} repo in {ms} ms',
+  fetchOk1: 'Fetch ok su 1 repo in {ms} ms',
+  sumRepos: '{n} repo',
+  sumRepos1: '1 repo',
+  sumDirty: '{n} con modifiche',
+  sumBehind: '{n} indietro',
+  sumAhead: '{n} avanti',
+  sumConflicts: '{n} in conflitto',
+  sumErrors: '{n} illeggibili',
+  sumClean: 'tutti puliti',
+  sbNone: 'nessun repo',
+  sbClean: '{n} repo puliti',
+  sbClean1: '1 repo pulito',
+  sbDirty: '{n} con modifiche',
+  sbBehind: '{n} indietro',
+  sbConflicts: '{n} in conflitto',
+  sbErrors: '{n} illeggibili',
+  sbTip: 'Git Overview: stato dei repo nella cartella del workspace attivo',
+  tipRootDir: 'Cartella scansionata: {root} ({source})',
   switchRunning: 'Switch in corso...',
   switchedTo: 'Ora su {name}',
   switchFailed: 'switch fallito',
@@ -150,8 +193,8 @@ const it: Record<Key, string> = {
   first200: 'Mostrati i primi 200 commit',
   current: 'corrente',
   switchTo: 'Passare a {name}?',
-  localBranches: 'Locali ({n})',
-  remoteBranches: 'Remoti ({n})',
+  localBranches: 'Locali',
+  remoteBranches: 'Remoti',
   remotesHint: 'I remoti sono quelli già noti in locale: usa Fetch per aggiornarli.',
   tipBranchSel: 'Branch da mostrare',
   allBranches: 'Tutti i branch',
@@ -167,23 +210,28 @@ const it: Record<Key, string> = {
   diffInvalid: 'File non valido',
   diffBinary: 'File binario: nessun diff testuale.',
   diffNone: 'Nessuna differenza testuale.',
-  diffFold: '··· {n} righe invariate ···'
-}
+  diffFold: '··· {n} righe invariate ···',
+};
 
-export const DICTIONARIES: Record<Lang, Record<Key, string>> = { en, it }
+export const DICTIONARIES: Record<Lang, Record<Key, string>> = { en, it };
 
 /** `setting` = valore di `language` (auto|en|it); `locale` = lingua del sistema (es. `it-IT`). */
 export function resolveLang(setting: unknown, locale: string): Lang {
-  if (setting === 'en' || setting === 'it') return setting
-  return locale.toLowerCase().startsWith('it') ? 'it' : 'en'
+  if (setting === 'en' || setting === 'it') return setting;
+  return locale.toLowerCase().startsWith('it') ? 'it' : 'en';
 }
 
-export type Translate = (key: Key, vars?: Record<string, string | number>) => string
+export type Translate = (key: Key, vars?: Record<string, string | number>) => string;
 
 export function makeT(lang: Lang): Translate {
-  const dict = DICTIONARIES[lang]
-  return (key, vars) => dict[key].replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k] ?? ''))
+  const dict = DICTIONARIES[lang];
+  return (key, vars) => {
+    // Singolare: se esiste `<chiave>1` e il conteggio (n, o total) vale 1, si usa quella.
+    const one = `${key}1` as Key;
+    const text = (vars?.n ?? vars?.total) === 1 && one in dict ? dict[one] : dict[key];
+    return text.replace(/\{(\w+)\}/g, (_, k: string) => String(vars?.[k] ?? ''));
+  };
 }
 
 /** Lingua nel formato di `toLocaleString`. */
-export const dateLocale = (lang: Lang): string => (lang === 'it' ? 'it-IT' : 'en-GB')
+export const dateLocale = (lang: Lang): string => (lang === 'it' ? 'it-IT' : 'en-GB');

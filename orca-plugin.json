@@ -2,9 +2,10 @@
   "manifestVersion": 2,
   "id": "git-overview",
   "publisher": "gino8080",
-  "name": "Git Overview",
+  "name": "Multi-Repo Git Overview",
+  "icon": "assets/icon.png",
   "version": "0.1.0",
-  "description": "Multi-repo overview: git status, branches, commit graph and file history for every repository in the active workspace folder.",
+  "description": "See every git repo of a multi-repo folder in one panel: dirty files, ahead/behind, branches and fetch-all. Complements Orca Source Control.",
   "repository": "https://github.com/gino8080/orca-git-overview",
   "engines": {
     "orca": ">=1.4.248"
@@ -17,7 +18,7 @@
       {
         "id": "overview",
         "title": "Git Overview",
-        "icon": "branch",
+        "icon": "layers",
         "entry": "panel/main.ts"
       }
     ],
@@ -51,11 +52,16 @@
       {
         "id": "gitdiff",
         "title": "Git Diff",
-        "extensions": [
-          ".gitdiff"
-        ],
+        "extensions": [".gitdiff"],
         "entry": "editor/diff.ts",
         "frame": "isolated"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "summary",
+        "text": "Git Overview",
+        "icon": "layers"
       }
     ]
   },
