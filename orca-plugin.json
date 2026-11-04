@@ -4,7 +4,18 @@
   "publisher": "gino8080",
   "name": "Multi-Repo Git Overview",
   "icon": "assets/icon.png",
-  "version": "0.1.0",
+  "cover": {
+    "path": "assets/cover.png",
+    "alt": "Multi-Repo Git Overview: status, branches and commit graph of every repository, in dark and light theme"
+  },
+  "screenshots": [
+    {
+      "path": "assets/screenshot-graph.png",
+      "alt": "Panel listing five repositories with their status, and the commit graph of one repository with a commit's changed files",
+      "caption": "Every repo of the folder, plus graph and commit detail"
+    }
+  ],
+  "version": "0.1.1",
   "description": "See every git repo of a multi-repo folder in one panel: dirty files, ahead/behind, branches and fetch-all. Complements Orca Source Control.",
   "repository": "https://github.com/gino8080/orca-git-overview",
   "engines": {
