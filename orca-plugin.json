@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 2,
+  "id": "git-overview",
+  "publisher": "gino8080",
+  "name": "Git Overview",
+  "version": "0.1.0",
+  "description": "Multi-repo overview: git status, branches, commit graph and file history for every repository in the active workspace folder.",
+  "repository": "https://github.com/gino8080/orca-git-overview",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "overview",
+        "title": "Git Overview",
+        "icon": "branch",
+        "entry": "panel/main.ts"
+      }
+    ],
+    "settings": [
+      {
+        "key": "rootDir",
+        "title": "Container folder",
+        "description": "Absolute path of a folder whose direct children are git repositories. Used only when the active workspace does not contain repositories.",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "key": "language",
+        "title": "Language",
+        "description": "Interface language. Auto follows the system language.",
+        "type": "string",
+        "enum": ["auto", "en", "it"],
+        "default": "auto"
+      },
+      {
+        "key": "refreshSeconds",
+        "title": "Auto refresh (seconds)",
+        "description": "0 = manual only.",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 3600
+      }
+    ],
+    "customEditors": [
+      {
+        "id": "gitdiff",
+        "title": "Git Diff",
+        "extensions": [
+          ".gitdiff"
+        ],
+        "entry": "editor/diff.ts",
+        "frame": "isolated"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "workspace:write"
+    },
+    {
+      "kind": "settings:own"
+    }
+  ]
+}
