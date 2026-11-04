@@ -15,6 +15,7 @@ import type { OrcaWorkerApi } from 'orca/worker';
 import type { DiffPayload } from '../shared/diff';
 import { makeT, resolveLang, type Translate } from '../shared/i18n';
 import { statusBarState, summarize } from '../shared/summary';
+import { pickWorkspace } from '../shared/workspace';
 import type {
   Branch,
   ChangedFile,
@@ -169,6 +170,32 @@ async function repoNames(root: string): Promise<string[]> {
 type Ws = { id: string; kind: string; name: string; path: string; branch: string | null };
 type WsMatch = { ws: Ws; rel: string };
 
+/**
+ * Cartelle dei terminali del workspace attivo, per distinguere workspace omonimi: gli id di
+ * `readContext` sono gli stessi di `orca terminal list`, che li associa a un `worktreePath`.
+ * Lista vuota se la CLI non c'è o fallisce (si ricade sull'ambiguità dichiarata).
+ */
+async function terminalPaths(terminals: { id: string }[]): Promise<string[]> {
+  if (terminals.length === 0) return [];
+  const bin = await orcaBin();
+  if (!bin) return [];
+  try {
+    const { stdout } = await run(bin, ['terminal', 'list', '--json'], {
+      timeout: 10_000,
+    });
+    const all = (JSON.parse(stdout).result?.terminals ?? []) as {
+      handle?: string;
+      worktreePath?: string;
+    }[];
+    const ids = new Set(terminals.map((t) => t.id));
+    return all
+      .filter((t) => t.handle && ids.has(t.handle) && t.worktreePath)
+      .map((t) => t.worktreePath as string);
+  } catch {
+    return [];
+  }
+}
+
 /** Cartella da scansionare: figli-repo del workspace attivo, altrimenti il setting rootDir. */
 async function resolveRoot(
   orca: OrcaWorkerApi,
@@ -178,15 +205,16 @@ async function resolveRoot(
     const ctx = (await orca.host.call('workspace.readContext', {})) as {
       displayName: string;
       branch: string;
+      terminals: { id: string }[];
     } | null;
     const { workspaces } = (await orca.host.call('workspace.list', {})) as {
       workspaces: Ws[];
     };
-    const ws =
-      ctx &&
-      workspaces.find(
-        (w) => w.name === ctx.displayName && (w.branch ?? '') === (ctx.branch ?? ''),
-      );
+    const pick = ctx
+      ? pickWorkspace(workspaces, ctx, await terminalPaths(ctx.terminals))
+      : ({ kind: 'none' } as const);
+    if (pick.kind === 'ambiguous') return { root: fallback, source: 'ambiguous' };
+    const ws = pick.kind === 'found' ? pick.ws : undefined;
     if (ws) {
       if ((await repoNames(ws.path)).length > 0)
         return { root: ws.path, source: `workspace:${ws.name}` };

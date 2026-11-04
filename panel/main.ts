@@ -112,7 +112,9 @@ const sourceLabel = (s: string): string =>
     ? t('sourceWorkspace', { name: s.slice(10) })
     : s.startsWith('parent:')
       ? t('sourceParent', { name: s.slice(7) })
-      : t('sourceSetting');
+      : s === 'ambiguous'
+        ? t('sourceAmbiguous')
+        : t('sourceSetting');
 
 /** Nome della cartella-gruppo mostrata (ultimo segmento di `root`). */
 const groupName = (): string => S.root.split(/[\\/]/).filter(Boolean).pop() ?? S.root;

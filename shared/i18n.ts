@@ -9,6 +9,8 @@ const en = {
   sourceWorkspace: 'active workspace: {name}',
   sourceParent: 'parent folder of the active workspace: {name}',
   sourceSetting: 'rootDir setting',
+  sourceAmbiguous:
+    'several workspaces share this name and branch: cannot tell which is active',
   // generali
   loading: 'Loading...',
   cancel: 'Cancel',
@@ -123,6 +125,8 @@ const it: Record<Key, string> = {
   sourceWorkspace: 'workspace attivo: {name}',
   sourceParent: 'cartella madre del workspace attivo: {name}',
   sourceSetting: 'setting rootDir',
+  sourceAmbiguous:
+    'più workspace hanno questo nome e branch: non so quale sia quello attivo',
   loading: 'Carico...',
   cancel: 'Annulla',
   errorPrefix: 'errore: {msg}',
