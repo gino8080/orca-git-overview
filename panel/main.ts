@@ -75,6 +75,7 @@ const S = {
   tab: 'changes' as Tab,
   selected: null as string | null,
   files: [] as ChangedFile[],
+  filesTotal: 0,
   filesLoading: false,
   selFile: null as { path: string; group: FileGroup } | null,
   branches: [] as Branch[],
@@ -102,9 +103,11 @@ const msg = (e: unknown): string => String((e as Error)?.message ?? e);
 const openFailure = (reason: string | undefined, path: string): string =>
   reason === 'git-not-dir'
     ? t('reasonGitNotDir')
-    : reason === 'no-workspace'
-      ? t('reasonNoWorkspace', { path })
-      : t('diffNotOpened');
+    : reason === 'preview-dir-unsafe'
+      ? t('reasonPreviewUnsafe')
+      : reason === 'no-workspace'
+        ? t('reasonNoWorkspace', { path })
+        : t('diffNotOpened');
 
 /** `source` di repos.list: `workspace:NOME`, `parent:NOME` (workspace = singolo repo) oppure `setting`. */
 const sourceLabel = (s: string): string =>
@@ -177,7 +180,28 @@ function iconBtn(
 }
 
 // ---- azioni
+let refreshing = false;
+let refreshAgain = false;
+
+/** Un solo giro alla volta: i trigger arrivati nel frattempo si fondono in una riesecuzione. */
 async function refresh(): Promise<void> {
+  if (refreshing) {
+    refreshAgain = true;
+    return;
+  }
+  refreshing = true;
+  try {
+    await refreshOnce();
+  } finally {
+    refreshing = false;
+  }
+  if (refreshAgain) {
+    refreshAgain = false;
+    await refresh();
+  }
+}
+
+async function refreshOnce(): Promise<void> {
   try {
     const a = await req('repos.list');
     S.repos = a.repos;
@@ -199,6 +223,7 @@ async function refresh(): Promise<void> {
 function resetDetail(path: string | null): void {
   S.selected = path;
   S.files = [];
+  S.filesTotal = 0;
   S.selFile = null;
   S.branches = [];
   S.target = null;
@@ -214,6 +239,7 @@ async function loadFiles(path: string): Promise<void> {
     const a = await req('repo.files', { path });
     if (S.selected === path) {
       S.files = a.files;
+      S.filesTotal = a.total;
       // il file selezionato non c'è più
       if (
         S.selFile &&
@@ -724,6 +750,14 @@ function viewChanges(repo: RepoStatus): HTMLElement {
       ),
     );
   }
+  if (S.filesTotal > S.files.length)
+    root.append(
+      h(
+        'div',
+        { class: 'muted' },
+        t('filesCapped', { n: S.files.length, total: S.filesTotal }),
+      ),
+    );
   if (S.selFile) {
     const f = S.files.find(
       (x) => x.path === S.selFile!.path && x.group === S.selFile!.group,
@@ -800,14 +834,22 @@ function viewBranches(repo: RepoStatus): HTMLElement {
   );
 }
 
-const fmtDate = (ms: number): string =>
-  new Date(ms).toLocaleString(dateLocale(lang), {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+let dateFmt: { lang: string; f: Intl.DateTimeFormat } | null = null;
+const fmtDate = (ms: number): string => {
+  // Un solo formatter per lingua: costruirlo a ogni riga costa centinaia di ms su 5000 commit.
+  if (!dateFmt || dateFmt.lang !== lang)
+    dateFmt = {
+      lang,
+      f: new Intl.DateTimeFormat(dateLocale(lang), {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+  return dateFmt.f.format(new Date(ms));
+};
 
 function refChip(r: GraphCommit['refs'][number]): HTMLElement {
   return h(
@@ -1436,7 +1478,17 @@ void (async () => {
     await select(view.selected);
   }
   app.addEventListener('scroll', saveView);
-  orca.on('workspace.changed', () => void refresh());
+  let debounce: ReturnType<typeof setTimeout> | undefined;
+  orca.on('workspace.changed', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => void refresh(), 300);
+  });
   const sec = await orca.settings.get('refreshSeconds');
-  if (typeof sec === 'number' && sec > 0) setInterval(() => void refresh(), sec * 1000);
+  if (typeof sec === 'number' && sec > 0) {
+    // setTimeout riarmato a fine giro: se un giro dura più dell'intervallo non si sovrappongono.
+    const tick = (): void => {
+      void refresh().finally(() => setTimeout(tick, sec * 1000));
+    };
+    setTimeout(tick, sec * 1000);
+  }
 })();

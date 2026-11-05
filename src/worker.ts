@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process';
 import {
   appendFile,
+  lstat,
   mkdir,
   readdir,
   readFile,
   realpath,
+  rename,
   rm,
   stat,
   writeFile,
@@ -32,13 +34,39 @@ import type {
 const run = promisify(execFile);
 const STATUS_BAR_POLL_MS = 120_000;
 
-async function git(cwd: string, args: string[]): Promise<string> {
+const GIT_ENV = { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' };
+const MAX_GIT_PROCS = 6;
+const MAX_FILES = 2000;
+let gitBusy = 0;
+const gitWaiters: Array<() => void> = [];
+
+/** Limita i processi git concorrenti (molti repo, fetch su ssh): gli altri aspettano il turno. */
+async function withSlot<T>(job: () => Promise<T>): Promise<T> {
+  if (gitBusy >= MAX_GIT_PROCS) await new Promise<void>((res) => gitWaiters.push(res));
+  else gitBusy++;
   try {
-    const { stdout } = await run('git', args, {
-      cwd,
-      timeout: 15_000,
-      maxBuffer: 8 << 20,
-    });
+    return await job();
+  } finally {
+    const next = gitWaiters.shift();
+    if (next) next();
+    else gitBusy--;
+  }
+}
+
+/**
+ * Esegue git su un repo che può non essere fidato: niente fsmonitor (comando arbitrario da
+ * `.git/config`), niente lock opzionali dell'indice (il polling non deve bloccare l'utente).
+ */
+async function git(cwd: string, args: string[], timeout = 15_000): Promise<string> {
+  try {
+    const { stdout } = await withSlot(() =>
+      run('git', ['-c', 'core.fsmonitor=false', ...args], {
+        cwd,
+        timeout,
+        maxBuffer: 8 << 20,
+        env: GIT_ENV,
+      }),
+    );
     return stdout;
   } catch (e) {
     if ((e as { code?: unknown }).code === 'ENOENT')
@@ -296,11 +324,28 @@ function diffArgs(file: string, group: FileGroup): string[] {
   assertRel(file);
   switch (group) {
     case 'staged':
-      return ['diff', '--cached', '-U1000000', '--', file];
+      return [
+        'diff',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--cached',
+        '-U1000000',
+        '--',
+        file,
+      ];
     case 'untracked':
-      return ['diff', '--no-index', '-U1000000', '--', '/dev/null', file];
+      return [
+        'diff',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--no-index',
+        '-U1000000',
+        '--',
+        '/dev/null',
+        file,
+      ];
     default:
-      return ['diff', '-U1000000', '--', file];
+      return ['diff', '--no-ext-diff', '--no-textconv', '-U1000000', '--', file];
   }
 }
 
@@ -393,6 +438,8 @@ function commitDiffArgs(hash: string, file: string, origFile?: string): string[]
       : [assertRel(file)];
   return [
     'show',
+    '--no-ext-diff',
+    '--no-textconv',
     '-m',
     '--first-parent',
     '--format=',
@@ -541,7 +588,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const names = await repoNames(root);
     const results: FetchResult[] = await Promise.all(
       names.map((name) =>
-        git(join(root, name), ['fetch', '--quiet', '--no-tags']).then(
+        git(join(root, name), ['fetch', '--quiet', '--no-tags'], 120_000).then(
           () => ({ name }),
           (e: Error) => ({ name, error: gitErrorLine(String(e.message)) }),
         ),
@@ -600,8 +647,16 @@ export default function activate(orca: OrcaWorkerApi): void {
     // Statistiche separate: un file può essere sia staged che modificato, con numeri diversi.
     const [st, numStaged, numUnstaged] = await Promise.all([
       git(path, [...q, 'status', '--porcelain=v2', '--untracked-files=all']),
-      git(path, [...q, 'diff', '--cached', '--numstat', '-z', '-M']).catch(() => ''),
-      git(path, [...q, 'diff', '--numstat', '-z']).catch(() => ''),
+      git(path, [
+        ...q,
+        'diff',
+        '--no-ext-diff',
+        '--cached',
+        '--numstat',
+        '-z',
+        '-M',
+      ]).catch(() => ''),
+      git(path, [...q, 'diff', '--no-ext-diff', '--numstat', '-z']).catch(() => ''),
     ]);
     const stats = {
       staged: parseNumstatZ(numStaged),
@@ -614,7 +669,8 @@ export default function activate(orca: OrcaWorkerApi): void {
           : undefined;
       return s ? { ...f, added: s[0], deleted: s[1] } : f;
     });
-    return { files };
+    // Tetto: decine di migliaia di righe bloccherebbero il pannello (es. node_modules non ignorata).
+    return { files: files.slice(0, MAX_FILES), total: files.length };
   });
 
   /** Workspace Orca del repo, portato in primo piano (editor.open da solo apre il tab in background). */
@@ -689,19 +745,27 @@ export default function activate(orca: OrcaWorkerApi): void {
     // non vedrebbe le riscritture. La cartella è esclusa da git via `.git/info/exclude`.
     const dir = join(path, PREVIEW_DIR);
     await excludeFromGit(gitDir, `/${PREVIEW_DIR}/`);
-    await mkdir(dir, { recursive: true });
-    // Pulizia dei file temporanei vecchi di oltre un'ora (escluso quello d'anteprima).
-    for (const f of await readdir(dir)) {
-      if (f === PREVIEW) continue;
-      const age = Date.now() - (await stat(join(dir, f))).mtimeMs;
-      if (age > 3_600_000) await rm(join(dir, f), { force: true });
-    }
+    // Repo non fidato: `.orca-overview` versionata come symlink punterebbe fuori dal repo.
+    const dirStat = await lstat(dir).catch(() => null);
+    if (dirStat && (dirStat.isSymbolicLink() || !dirStat.isDirectory()))
+      return { opened: false, reason: 'preview-dir-unsafe' };
+    if (!dirStat) await mkdir(dir);
+    const file = join(dir, PREVIEW);
+    const fileStat = await lstat(file).catch(() => null);
+    if (fileStat && !fileStat.isFile())
+      return { opened: false, reason: 'preview-dir-unsafe' };
     // L'editor isolato non legge i setting: la lingua viaggia nel file.
     const lang = resolveLang(
       await orca.settings.get('language'),
       Intl.DateTimeFormat().resolvedOptions().locale,
     );
-    await writeFile(join(dir, PREVIEW), JSON.stringify({ ...payload, lang }));
+    // File temporaneo + rename: sostituisce la voce invece di seguire un eventuale symlink.
+    const tmp = join(
+      dir,
+      `${PREVIEW}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
+    );
+    await writeFile(tmp, JSON.stringify({ ...payload, lang }), { flag: 'wx' });
+    await rename(tmp, file);
     await orca.host.call('workspace.open', { workspaceId: m.ws.id });
     await orca.host.call('editor.open', {
       workspaceId: m.ws.id,
@@ -823,7 +887,16 @@ export default function activate(orca: OrcaWorkerApi): void {
     await assertRepo(path);
     assertHash(hash);
     // -m --first-parent: per un merge mostra le differenze rispetto al primo genitore.
-    const show = ['-c', 'core.quotepath=false', 'show', '-m', '--first-parent', '-M'];
+    const show = [
+      '-c',
+      'core.quotepath=false',
+      'show',
+      '--no-ext-diff',
+      '--no-textconv',
+      '-m',
+      '--first-parent',
+      '-M',
+    ];
     const [out, num] = await Promise.all([
       git(path, [...show, '--name-status', '--format=%x01%B%x01', hash, '--']),
       git(path, [...show, '--numstat', '-z', '--format=', hash, '--']).catch(() => ''),

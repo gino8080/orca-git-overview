@@ -6,6 +6,7 @@ const en = {
   // worker -> motivi del rifiuto di un'apertura
   reasonNoWorkspace: 'No Orca workspace registered for {path}',
   reasonGitNotDir: '.git is not a directory (linked worktree?)',
+  reasonPreviewUnsafe: '.orca-overview is a symlink or not a folder: preview refused',
   sourceWorkspace: 'active workspace: {name}',
   sourceParent: 'parent folder of the active workspace: {name}',
   sourceSetting: 'rootDir setting',
@@ -90,6 +91,7 @@ const en = {
   noFileCommits: 'No commits for this file.',
   historyErr: 'History: {msg}',
   first200: 'Showing the first 200 commits',
+  filesCapped: 'Showing the first {n} of {total} changed files',
   // branch
   current: 'current',
   switchTo: 'Switch to {name}?',
@@ -122,6 +124,8 @@ export type Lang = 'en' | 'it';
 const it: Record<Key, string> = {
   reasonNoWorkspace: 'Nessun workspace Orca registrato per {path}',
   reasonGitNotDir: '.git non è una cartella (worktree collegato?)',
+  reasonPreviewUnsafe:
+    '.orca-overview è un link o non è una cartella: anteprima rifiutata',
   sourceWorkspace: 'workspace attivo: {name}',
   sourceParent: 'cartella madre del workspace attivo: {name}',
   sourceSetting: 'setting rootDir',
@@ -200,6 +204,7 @@ const it: Record<Key, string> = {
   noFileCommits: 'Nessun commit per questo file.',
   historyErr: 'Storico: {msg}',
   first200: 'Mostrati i primi 200 commit',
+  filesCapped: 'Mostrati i primi {n} file modificati su {total}',
   current: 'corrente',
   switchTo: 'Passare a {name}?',
   localBranches: 'Locali',

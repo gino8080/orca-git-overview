@@ -25,7 +25,7 @@ export interface FetchResult {
 }
 
 /** Motivo per cui un'apertura nel workspace non è riuscita (il pannello lo traduce). */
-export type OpenFailure = 'no-workspace' | 'git-not-dir';
+export type OpenFailure = 'no-workspace' | 'git-not-dir' | 'preview-dir-unsafe';
 
 export type FileGroup = 'staged' | 'unstaged' | 'untracked' | 'conflict';
 
@@ -83,7 +83,10 @@ declare module 'orca' {
     'repos.list': {
       output: { root: string; source: string; repos: RepoStatus[]; tookMs: number };
     };
-    'repo.files': { input: { path: string }; output: { files: ChangedFile[] } };
+    'repo.files': {
+      input: { path: string };
+      output: { files: ChangedFile[]; total: number };
+    };
     'file.open': {
       input: { repoPath: string; file: string };
       output: { opened: boolean };

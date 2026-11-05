@@ -49,7 +49,7 @@ The plugin runs as a `trusted-worker`: its worker has your user's access and exe
 the native diff, the `orca` CLI). Every request is validated: repositories must be children of the scanned
 folder, file paths must be relative without `..`, commit hashes must be hexadecimal, and untracked files
 cannot be read through symlinks that leave the repository. Temporary diff files are written to
-`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never committed) and removed after an hour. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
+`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never committed) and overwritten at every preview. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
 
 ## Develop
 
