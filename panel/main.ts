@@ -49,6 +49,8 @@ interface GraphState {
   branch: string;
   layout: GraphLayout | null;
   layoutKey: string;
+  /** SVG già costruito per `layout`: si riusa finché il layout non cambia. */
+  svg: Node | null;
   sel: string | null;
   detail: { body: string; files: FileEntry[] } | null;
   fileSel: FileEntry | null;
@@ -300,6 +302,7 @@ async function loadGraph(
     branch,
     layout: null,
     layoutKey: '',
+    svg: null,
     sel: null,
     detail: null,
     fileSel: null,
@@ -917,13 +920,14 @@ function viewGraph(repo: RepoStatus): HTMLElement {
   if (G.layoutKey !== key || !G.layout) {
     G.layout = layoutGraph(rows, G.head);
     G.layoutKey = key;
+    G.svg = renderGraphSvg(G.layout) as unknown as Node;
   }
   const gw = Math.min(G.layout.width, GRAPH_MAX_WIDTH);
 
   const svgBox = h(
     'div',
     { class: 'gsvg', style: `width:${gw}px;height:${G.layout.height}px` },
-    renderGraphSvg(G.layout) as unknown as Node,
+    G.svg ?? (renderGraphSvg(G.layout) as unknown as Node),
   );
   const line = (children: Child[], cls: string, onclick: () => void, title: string) =>
     h(

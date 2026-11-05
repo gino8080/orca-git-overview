@@ -838,24 +838,28 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('file.log', async ({ path, file }) => {
     await assertRepo(path);
     assertRel(file);
-    const out = await git(path, [
-      '-c',
-      'core.quotepath=false',
-      'log',
-      '--follow',
-      '--name-only',
-      `-n${LOG_LIMIT + 1}`,
-      '--format=%x01%h%x09%an%x09%ct%x09%s',
-      '--',
-      file,
-    ]).catch(() => '');
+    const out = await git(
+      path,
+      [
+        '-c',
+        'core.quotepath=false',
+        'log',
+        '--follow',
+        '--name-only',
+        `-n${LOG_LIMIT + 1}`,
+        '--format=%x01%h%x09%an%x09%ct%x09%s',
+        '--',
+        file,
+      ],
+      60_000,
+    ).catch(() => '');
     const all = parseFileLog(out);
     return { commits: all.slice(0, LOG_LIMIT), truncated: all.length > LOG_LIMIT };
   });
 
   orca.panels.handle('repo.graph', async ({ path, limit: rawLimit, remotes, branch }) => {
     await assertRepo(path);
-    const limit = clampLimit(rawLimit);
+    const limit = clampLimit(rawLimit, 2000);
     const names = (await git(path, ['remote']).catch(() => ''))
       .split('\n')
       .filter(Boolean);
@@ -865,14 +869,18 @@ export default function activate(orca: OrcaWorkerApi): void {
       ? ['--end-of-options', branch]
       : ['--branches', '--tags', ...(remotes ? ['--remotes'] : []), 'HEAD'];
     const [out, head] = await Promise.all([
-      git(path, [
-        'log',
-        '--topo-order',
-        `-n${limit + 1}`,
-        '--format=%x01%H%x09%P%x09%an%x09%ct%x09%D%x09%s',
-        ...scope,
-        '--',
-      ]),
+      git(
+        path,
+        [
+          'log',
+          '--topo-order',
+          `-n${limit + 1}`,
+          '--format=%x01%H%x09%P%x09%an%x09%ct%x09%D%x09%s',
+          ...scope,
+          '--',
+        ],
+        60_000,
+      ),
       git(path, ['rev-parse', 'HEAD']).catch(() => ''),
     ]);
     const all = parseGraphLog(out, names);
