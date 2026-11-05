@@ -31,7 +31,19 @@ declare const orca: {
   };
 };
 
-const req = <T = any>(name: string, input?: unknown, timeoutMs?: number): Promise<T> =>
+type Requests = import('orca').PluginRequests;
+type ReqInput<K extends keyof Requests> = Requests[K] extends { input: infer I }
+  ? I
+  : void;
+type ReqOutput<K extends keyof Requests> = Requests[K] extends { output: infer O }
+  ? O
+  : never;
+
+const req = <K extends keyof Requests>(
+  name: K,
+  input?: ReqInput<K>,
+  timeoutMs?: number,
+): Promise<ReqOutput<K>> =>
   orca.plugin.request(name, input, timeoutMs ? { timeoutMs } : undefined);
 
 // Lingua e traduttore: si impostano all'avvio dal setting `language`.
@@ -128,6 +140,14 @@ const selectedRepo = (): RepoStatus | null =>
 
 // ---- DOM helper
 type Child = Node | string | null | false | undefined;
+const NATIVE_INTERACTIVE = new Set([
+  'button',
+  'a',
+  'input',
+  'select',
+  'textarea',
+  'summary',
+]);
 function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: Record<string, unknown> = {},
@@ -140,6 +160,18 @@ function h<K extends keyof HTMLElementTagNameMap>(
       el.addEventListener(k.slice(2), v as EventListener);
     else if (v === true) el.setAttribute(k, '');
     else if (v !== false && v != null) el.setAttribute(k, String(v));
+  }
+  // Righe e voci cliccabili (div/span): focus da tastiera e attivazione con Invio/Spazio.
+  if (typeof props.onclick === 'function' && !NATIVE_INTERACTIVE.has(tag)) {
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+    el.tabIndex = 0;
+    el.addEventListener('keydown', (e) => {
+      const ev = e as KeyboardEvent;
+      // Solo se il focus è sull'elemento stesso: un pulsante interno gestisce i propri tasti.
+      if (ev.target !== el || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+      ev.preventDefault();
+      el.click();
+    });
   }
   for (const c of children) if (c) el.append(c);
   return el;
@@ -185,7 +217,10 @@ function iconBtn(
 let refreshing = false;
 let refreshAgain = false;
 
-/** Un solo giro alla volta: i trigger arrivati nel frattempo si fondono in una riesecuzione. */
+/**
+ * Un solo giro alla volta: i trigger arrivati nel frattempo si fondono in una riesecuzione.
+ * Attenzione: se un giro è già in corso ritorna subito, senza aspettarne i dati.
+ */
 async function refresh(): Promise<void> {
   if (refreshing) {
     refreshAgain = true;
@@ -234,12 +269,15 @@ function resetDetail(path: string | null): void {
   S.hist = null;
 }
 
+let filesSeq = 0;
+
 async function loadFiles(path: string): Promise<void> {
+  const seq = ++filesSeq;
   S.filesLoading = true;
   render();
   try {
     const a = await req('repo.files', { path });
-    if (S.selected === path) {
+    if (S.selected === path && seq === filesSeq) {
       S.files = a.files;
       S.filesTotal = a.total;
       // il file selezionato non c'è più
@@ -254,7 +292,7 @@ async function loadFiles(path: string): Promise<void> {
   } catch (e) {
     S.failure = msg(e);
   }
-  S.filesLoading = false;
+  if (seq === filesSeq) S.filesLoading = false;
   render();
 }
 
@@ -415,12 +453,12 @@ function showCommitDiff(repo: RepoStatus, c: FileCommit): void {
   void previewDiff(repo, { file: c.path, group: 'unstaged', hash: c.hash });
 }
 
-async function call(
+async function call<K extends keyof Requests>(
   label: string,
-  name: string,
-  input: unknown,
+  name: K,
+  input: ReqInput<K>,
   timeoutMs?: number,
-): Promise<any> {
+): Promise<ReqOutput<K> | null> {
   try {
     return await req(name, input, timeoutMs);
   } catch (e) {
@@ -466,10 +504,13 @@ async function openRepo(repo: RepoStatus): Promise<void> {
   }
 }
 
+/** Il worker fa fetch a 3 alla volta, 120 s al massimo ciascuno: la richiesta non può durare meno. */
+const FETCH_ALL_TIMEOUT_MS = 600_000;
+
 async function fetchAll(): Promise<void> {
   S.note = t('fetchRunning');
   render();
-  const r = await call('Fetch', 'repos.fetch', undefined, 120000);
+  const r = await call('Fetch', 'repos.fetch', undefined, FETCH_ALL_TIMEOUT_MS);
   if (r) {
     S.note = fetchReport(r.results, r.tookMs, t);
   }
@@ -708,7 +749,7 @@ function viewHistory(repo: RepoStatus, f: ChangedFile): HTMLElement {
             h(
               'div',
               { class: 'desc' },
-              `${c.hash} · ${c.author} · ${new Date(c.at).toLocaleDateString()}` +
+              `${c.hash} · ${c.author} · ${fmtDate(c.at)}` +
                 (c.path !== f.path ? ` · ${c.path}` : ''),
             ),
           ),
@@ -1188,7 +1229,22 @@ function viewCommitDetail(repo: RepoStatus, G: GraphState): HTMLElement {
 
 /** Divisore trascinabile: sposta la quota di altezza tra lista e dettaglio (somma costante); salva al rilascio. */
 function splitter(list: HTMLElement, detail: HTMLElement): HTMLElement {
-  const bar = h('div', { class: 'vsplit', title: t('tipSplitter') });
+  const bar = h('div', {
+    class: 'vsplit',
+    title: t('tipSplitter'),
+    role: 'separator',
+    'aria-orientation': 'horizontal',
+    tabindex: 0,
+  });
+  bar.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+    ev.preventDefault();
+    const step = ev.key === 'ArrowUp' ? -0.05 : 0.05;
+    S.paneR = Math.min(0.9, Math.max(0.1, S.paneR + step));
+    list.style.flex = `${S.paneR} 1 0`;
+    detail.style.flex = `${1 - S.paneR} 1 0`;
+    void orca.storage.set('paneR', S.paneR);
+  });
   bar.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     bar.setPointerCapture(ev.pointerId);
@@ -1390,7 +1446,9 @@ body { margin:0; padding:10px 14px; height:100vh; box-sizing:border-box; display
 .dfill { flex:1 1 0; min-height:360px } .gfill { flex:1 1 0; min-height:0 }
 .row { display:flex; gap:6px; align-items:center } .between { justify-content:space-between }
 .stack { display:flex; flex-direction:column; gap:8px }
-:root[data-theme='light'] { --c-warn:#8a5a00; --c-danger:#b42318; --c-info:#0b5cad; --c-ok:#1a7f37; --c-purple:#6f42c1 }
+:root { --c-conflict:#ff9f43 }
+:root[data-theme='light'] { --c-conflict:#b45309; --c-warn:#8a5a00; --c-danger:#b42318; --c-info:#0b5cad; --c-ok:#1a7f37; --c-purple:#6f42c1 }
+[role='button']:focus-visible, .vsplit:focus-visible { outline:1px solid var(--c-info); outline-offset:-1px }
 .muted { color:var(--dim); font-size:12px } .dim { color:var(--dim) } .trunc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace }
 hr { width:100%; border:0; border-top:1px solid var(--line); margin:2px 0 }
@@ -1418,7 +1476,7 @@ hr { width:100%; border:0; border-top:1px solid var(--line); margin:2px 0 }
 .p-ok { color:var(--c-ok) } .p-warn { color:var(--c-warn) } .p-danger { color:var(--c-danger) } .p-dim { color:var(--dim) }
 .ficon { flex:none; display:inline-flex } .ficon svg { display:block }
 .code { flex:none; width:14px; text-align:right; font:700 11px ui-monospace,monospace }
-.st-M { color:var(--c-warn) } .st-A, .st-q { color:var(--c-ok) } .st-D { color:var(--c-danger) } .st-R, .st-C { color:var(--c-info) } .st-U { color:#ff9f43 } .st-T { color:var(--c-purple) }
+.st-M { color:var(--c-warn) } .st-A, .st-q { color:var(--c-ok) } .st-D { color:var(--c-danger) } .st-R, .st-C { color:var(--c-info) } .st-U { color:var(--c-conflict) } .st-T { color:var(--c-purple) }
 .frow { display:flex; align-items:center; gap:6px } .fname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis }
 .add, .del { flex:none; font:11px ui-monospace,monospace; opacity:.85 } .add { color:var(--c-ok) } .del { color:var(--c-danger) }
 summary { cursor:pointer; display:flex; align-items:center; gap:6px; padding:3px 0; list-style:none; user-select:none }

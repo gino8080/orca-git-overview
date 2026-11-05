@@ -26,7 +26,7 @@ Everything is read-only except the explicit **Switch** and **Fetch** actions.
 ## Requirements
 
 - Orca `>= 1.4.248`
-- `git` on `PATH`
+- `git` >= 2.24 on `PATH` (the graph uses `--end-of-options`, branch switching uses `git switch`)
 - Repositories must have `.git` as a **directory** to open diffs in the central tab (linked worktrees, where `.git` is a file, are not supported for that feature).
 
 ## How repositories are found
@@ -49,7 +49,11 @@ The plugin runs as a `trusted-worker`: its worker has your user's access and exe
 the native diff, the `orca` CLI). Every request is validated: repositories must be children of the scanned
 folder, file paths must be relative without `..`, commit hashes must be hexadecimal, and untracked files
 cannot be read through symlinks that leave the repository. Temporary diff files are written to
-`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never committed) and overwritten at every preview. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
+`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never versioned) and overwritten at every preview. Git's local exclude is not a `.gitignore`: tools that only read `.gitignore` (`npm pack`, Docker build contexts, rsync, zip) will include `.orca-overview/anteprima.gitdiff`, which holds the last diff you opened, so delete the folder before packaging a repository. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
+
+**Trust model.** The plugin assumes the *tracked content* of a repository can be hostile, not its `.git` folder. Background reads run `git` with `core.fsmonitor=false`, `color.ui=never`, no optional index locks and no external diff or textconv drivers. The explicit **Fetch** and **Switch** actions are different: they run `git` with the repository's own configuration (`core.sshCommand`, credential helpers, hooks such as `post-checkout`), exactly as if you ran them in a terminal. Do not use them on repositories whose `.git` you received from someone you do not trust.
+
+**Windows.** The native diff needs `orca.exe` on `PATH`; without it the plugin falls back to its own preview.
 
 ## Develop
 

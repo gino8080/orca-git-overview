@@ -15,6 +15,7 @@ import { delimiter, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { OrcaWorkerApi } from 'orca/worker';
 import type { DiffPayload } from '../shared/diff';
+import { createLimiter, unquoteC } from '../shared/gitutil';
 import { makeT, resolveLang, type Translate } from '../shared/i18n';
 import { statusBarState, summarize } from '../shared/summary';
 import { pickWorkspace } from '../shared/workspace';
@@ -35,32 +36,26 @@ const run = promisify(execFile);
 const STATUS_BAR_POLL_MS = 120_000;
 
 const GIT_ENV = { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' };
-const MAX_GIT_PROCS = 6;
 const MAX_FILES = 2000;
-let gitBusy = 0;
-const gitWaiters: Array<() => void> = [];
-
-/** Limita i processi git concorrenti (molti repo, fetch su ssh): gli altri aspettano il turno. */
-async function withSlot<T>(job: () => Promise<T>): Promise<T> {
-  if (gitBusy >= MAX_GIT_PROCS) await new Promise<void>((res) => gitWaiters.push(res));
-  else gitBusy++;
-  try {
-    return await job();
-  } finally {
-    const next = gitWaiters.shift();
-    if (next) next();
-    else gitBusy--;
-  }
-}
+const GRAPH_MAX = 2000;
+/** Code separate: un fetch lento su ssh non deve far aspettare lo stato dei repo. */
+const readSlot = createLimiter(6);
+const fetchSlot = createLimiter(3);
 
 /**
  * Esegue git su un repo che può non essere fidato: niente fsmonitor (comando arbitrario da
  * `.git/config`), niente lock opzionali dell'indice (il polling non deve bloccare l'utente).
  */
-async function git(cwd: string, args: string[], timeout = 15_000): Promise<string> {
+async function git(
+  cwd: string,
+  args: string[],
+  timeout = 15_000,
+  slot = readSlot,
+): Promise<string> {
   try {
-    const { stdout } = await withSlot(() =>
-      run('git', ['-c', 'core.fsmonitor=false', ...args], {
+    const { stdout } = await slot(() =>
+      // color.ui=never: con `always` nel config dell'utente i diff arriverebbero con codici ANSI.
+      run('git', ['-c', 'core.fsmonitor=false', '-c', 'color.ui=never', ...args], {
         cwd,
         timeout,
         maxBuffer: 8 << 20,
@@ -69,13 +64,15 @@ async function git(cwd: string, args: string[], timeout = 15_000): Promise<strin
     );
     return stdout;
   } catch (e) {
-    if ((e as { code?: unknown }).code === 'ENOENT')
+    // ENOENT anche se manca la cartella (cwd): solo `path === 'git'` indica l'eseguibile assente.
+    const err = e as { code?: unknown; path?: unknown };
+    if (err.code === 'ENOENT' && err.path === 'git')
       throw new Error('git not found in PATH');
     throw e;
   }
 }
 
-const HASH_RE = /^[0-9a-f]{4,40}$/i;
+const HASH_RE = /^[0-9a-f]{4,64}$/i;
 
 export function assertHash(hash: string): string {
   if (typeof hash !== 'string' || !HASH_RE.test(hash))
@@ -170,7 +167,7 @@ async function repoStatus(root: string, name: string): Promise<RepoStatus> {
       stash: 0,
       lastCommitAt: null,
       lastCommitSubject: '',
-      error: String((e as Error).message),
+      error: gitErrorLine(String((e as Error).message)),
     };
   }
 }
@@ -238,9 +235,9 @@ async function resolveRoot(
     const { workspaces } = (await orca.host.call('workspace.list', {})) as {
       workspaces: Ws[];
     };
-    const pick = ctx
-      ? pickWorkspace(workspaces, ctx, await terminalPaths(ctx.terminals))
-      : ({ kind: 'none' } as const);
+    let pick = ctx ? pickWorkspace(workspaces, ctx, []) : ({ kind: 'none' } as const);
+    if (ctx && pick.kind === 'ambiguous')
+      pick = pickWorkspace(workspaces, ctx, await terminalPaths(ctx.terminals));
     if (pick.kind === 'ambiguous') return { root: fallback, source: 'ambiguous' };
     const ws = pick.kind === 'found' ? pick.ws : undefined;
     if (ws) {
@@ -275,7 +272,9 @@ export function parseFiles(out: string): ChangedFile[] {
         .split(' ')
         .slice(t === '1' ? 8 : 9)
         .join(' ');
-      const [path, orig] = rest.split('\t');
+      const [rawPath, rawOrig] = rest.split('\t');
+      const path = unquoteC(rawPath);
+      const orig = rawOrig ? unquoteC(rawOrig) : '';
       // Niente chiavi undefined: l'host rifiuta valori non JSON.
       const origPath = orig ? { origPath: orig } : {};
       if (xy[0] !== '.')
@@ -298,7 +297,7 @@ export function parseFiles(out: string): ChangedFile[] {
         });
     } else if (t === 'u') {
       files.push({
-        path: line.split(' ').slice(10).join(' '),
+        path: unquoteC(line.split(' ').slice(10).join(' ')),
         code: 'U',
         group: 'conflict',
         added: null,
@@ -306,7 +305,7 @@ export function parseFiles(out: string): ChangedFile[] {
       });
     } else if (t === '?') {
       files.push({
-        path: line.slice(2),
+        path: unquoteC(line.slice(2)),
         code: '?',
         group: 'untracked',
         added: null,
@@ -334,6 +333,7 @@ function diffArgs(file: string, group: FileGroup): string[] {
         file,
       ];
     case 'untracked':
+    case 'conflict':
       return [
         'diff',
         '--no-ext-diff',
@@ -363,7 +363,7 @@ async function orcaBin(): Promise<string | null> {
     ...ORCA_DIRS,
   ];
   for (const d of dirs) {
-    const b = join(d, process.platform === 'win32' ? 'orca.cmd' : 'orca');
+    const b = join(d, process.platform === 'win32' ? 'orca.exe' : 'orca');
     try {
       await stat(b);
       return b;
@@ -380,12 +380,13 @@ async function nativeDiff(
   file: string,
   group: FileGroup,
 ): Promise<string | null> {
-  if (group === 'untracked') return null;
+  if (group === 'untracked' || file.startsWith('-')) return null;
   const bin = await orcaBin();
   if (!bin) return null;
   const args = [
     'file',
     'diff',
+    '--path',
     file,
     '--worktree',
     `path:${repoPath}`,
@@ -526,8 +527,10 @@ export function parseGraphLog(out: string, remotes: string[]): GraphCommit[] {
 export function parseNameStatus(out: string): FileEntry[] {
   const files: FileEntry[] = [];
   for (const line of out.split('\n').filter(Boolean)) {
-    const [st, a, b] = line.split('\t');
-    if (!st || !a) continue;
+    const [st, ra, rb] = line.split('\t');
+    if (!st || !ra) continue;
+    const a = unquoteC(ra);
+    const b = rb ? unquoteC(rb) : '';
     const base = { code: st[0], added: null, deleted: null };
     files.push(b ? { path: b, origPath: a, ...base } : { path: a, ...base });
   }
@@ -588,7 +591,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const names = await repoNames(root);
     const results: FetchResult[] = await Promise.all(
       names.map((name) =>
-        git(join(root, name), ['fetch', '--quiet', '--no-tags'], 120_000).then(
+        git(join(root, name), ['fetch', '--quiet', '--no-tags'], 120_000, fetchSlot).then(
           () => ({ name }),
           (e: Error) => ({ name, error: gitErrorLine(String(e.message)) }),
         ),
@@ -670,6 +673,13 @@ export default function activate(orca: OrcaWorkerApi): void {
       return s ? { ...f, added: s[0], deleted: s[1] } : f;
     });
     // Tetto: decine di migliaia di righe bloccherebbero il pannello (es. node_modules non ignorata).
+    const order: Record<FileGroup, number> = {
+      conflict: 0,
+      staged: 1,
+      unstaged: 2,
+      untracked: 3,
+    };
+    files.sort((x, y) => order[x.group] - order[y.group]);
     return { files: files.slice(0, MAX_FILES), total: files.length };
   });
 
@@ -749,7 +759,14 @@ export default function activate(orca: OrcaWorkerApi): void {
     const dirStat = await lstat(dir).catch(() => null);
     if (dirStat && (dirStat.isSymbolicLink() || !dirStat.isDirectory()))
       return { opened: false, reason: 'preview-dir-unsafe' };
-    if (!dirStat) await mkdir(dir);
+    if (!dirStat) await mkdir(dir, { recursive: true });
+    // Temporanei lasciati da un rename fallito (antivirus su Windows, disco pieno): oltre 1 h si tolgono.
+    for (const f of await readdir(dir)) {
+      if (!f.startsWith(`${PREVIEW}.`) || !f.endsWith('.tmp')) continue;
+      const st = await lstat(join(dir, f)).catch(() => null);
+      if (st && Date.now() - st.mtimeMs > 3_600_000)
+        await rm(join(dir, f), { force: true });
+    }
     const file = join(dir, PREVIEW);
     const fileStat = await lstat(file).catch(() => null);
     if (fileStat && !fileStat.isFile())
@@ -764,8 +781,13 @@ export default function activate(orca: OrcaWorkerApi): void {
       dir,
       `${PREVIEW}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
     );
-    await writeFile(tmp, JSON.stringify({ ...payload, lang }), { flag: 'wx' });
-    await rename(tmp, file);
+    try {
+      await writeFile(tmp, JSON.stringify({ ...payload, lang }), { flag: 'wx' });
+      await rename(tmp, file);
+    } catch (e) {
+      await rm(tmp, { force: true });
+      throw e;
+    }
     await orca.host.call('workspace.open', { workspaceId: m.ws.id });
     await orca.host.call('editor.open', {
       workspaceId: m.ws.id,
@@ -852,14 +874,14 @@ export default function activate(orca: OrcaWorkerApi): void {
         file,
       ],
       60_000,
-    ).catch(() => '');
+    );
     const all = parseFileLog(out);
     return { commits: all.slice(0, LOG_LIMIT), truncated: all.length > LOG_LIMIT };
   });
 
   orca.panels.handle('repo.graph', async ({ path, limit: rawLimit, remotes, branch }) => {
     await assertRepo(path);
-    const limit = clampLimit(rawLimit, 2000);
+    const limit = clampLimit(rawLimit, GRAPH_MAX);
     const names = (await git(path, ['remote']).catch(() => ''))
       .split('\n')
       .filter(Boolean);
@@ -868,26 +890,26 @@ export default function activate(orca: OrcaWorkerApi): void {
     const scope = branch
       ? ['--end-of-options', branch]
       : ['--branches', '--tags', ...(remotes ? ['--remotes'] : []), 'HEAD'];
-    const [out, head] = await Promise.all([
-      git(
-        path,
-        [
-          'log',
-          '--topo-order',
-          `-n${limit + 1}`,
-          '--format=%x01%H%x09%P%x09%an%x09%ct%x09%D%x09%s',
-          ...scope,
-          '--',
-        ],
-        60_000,
-      ),
-      git(path, ['rev-parse', 'HEAD']).catch(() => ''),
-    ]);
+    const head = await git(path, ['rev-parse', 'HEAD']).catch(() => '');
+    // Repo senza storia: `log HEAD` darebbe un errore grezzo.
+    if (!head.trim()) return { commits: [], head: null, hasMore: false };
+    const out = await git(
+      path,
+      [
+        'log',
+        '--topo-order',
+        `-n${limit + 1}`,
+        '--format=%x01%H%x09%P%x09%an%x09%ct%x09%D%x09%s',
+        ...scope,
+        '--',
+      ],
+      60_000,
+    );
     const all = parseGraphLog(out, names);
     return {
       commits: all.slice(0, limit),
       head: head.trim() || null,
-      hasMore: all.length > limit,
+      hasMore: all.length > limit && limit < GRAPH_MAX,
     };
   });
 

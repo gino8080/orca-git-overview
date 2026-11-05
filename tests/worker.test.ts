@@ -126,9 +126,10 @@ test('assertRel rifiuta percorsi assoluti, .. e NUL', () => {
     assert.throws(() => assertRel(bad));
 });
 
-test('assertHash accetta solo hex di 4-40 caratteri', () => {
+test('assertHash accetta solo hex di 4-64 caratteri (SHA-1 e SHA-256)', () => {
   assert.equal(assertHash('abc1234'), 'abc1234');
-  for (const bad of ['--all', 'abc', 'xyz1234', '-n1', 'a'.repeat(41)])
+  assert.equal(assertHash('a'.repeat(64)), 'a'.repeat(64));
+  for (const bad of ['--all', 'abc', 'xyz1234', '-n1', 'a'.repeat(65)])
     assert.throws(() => assertHash(bad));
 });
 
