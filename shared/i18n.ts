@@ -110,6 +110,7 @@ const en = {
   commitErr: 'Commit: {msg}',
   tipCloseDetail: 'Close detail',
   tipSplitter: 'Drag to resize list and detail',
+  tipDismiss: 'Click to dismiss',
   // editor diff
   diffInvalid: 'Invalid file',
   diffBinary: 'Binary file: no text diff.',
@@ -221,6 +222,7 @@ const it: Record<Key, string> = {
   commitErr: 'Commit: {msg}',
   tipCloseDetail: 'Chiudi il dettaglio',
   tipSplitter: 'Trascina per ridimensionare lista e dettaglio',
+  tipDismiss: 'Clic per chiudere',
   diffInvalid: 'File non valido',
   diffBinary: 'File binario: nessun diff testuale.',
   diffNone: 'Nessuna differenza testuale.',

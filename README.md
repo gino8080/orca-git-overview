@@ -1,9 +1,13 @@
 # Git Overview
 
-A multi-repository overview for [Orca](https://github.com/stablyai/orca): the git state of **every
-repository inside the active workspace folder** in one right-sidebar panel. It is built for containers
-that hold several repos without a common `.git` (for example `project/api`, `project/web`,
-`project/docs`).
+Orca's Source Control shows one repository at a time. If your project is a folder with several
+repositories and no common `.git` (for example `project/api`, `project/web`, `project/docs`), you
+end up opening each one to find out which has pending work, which is behind its remote and which
+is on the wrong branch.
+
+This plugin puts **every repository inside the active workspace folder** in one right-sidebar panel
+of [Orca](https://github.com/stablyai/orca): status at a glance, a summary ("3 with changes",
+"on 2 different branches") and a single **Fetch** for all of them.
 
 ## How it relates to Orca's Source Control
 

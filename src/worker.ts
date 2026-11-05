@@ -35,7 +35,11 @@ import type {
 const run = promisify(execFile);
 const STATUS_BAR_POLL_MS = 120_000;
 
-const GIT_ENV = { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' };
+const GIT_ENV = {
+  ...process.env,
+  GIT_OPTIONAL_LOCKS: '0',
+  GIT_TERMINAL_PROMPT: '0',
+};
 const MAX_FILES = 2000;
 const GRAPH_MAX = 2000;
 /** Code separate: un fetch lento su ssh non deve far aspettare lo stato dei repo. */
@@ -58,6 +62,7 @@ async function git(
       run('git', ['-c', 'core.fsmonitor=false', '-c', 'color.ui=never', ...args], {
         cwd,
         timeout,
+        killSignal: 'SIGKILL' as const,
         maxBuffer: 8 << 20,
         env: GIT_ENV,
       }),
@@ -585,20 +590,15 @@ export default function activate(orca: OrcaWorkerApi): void {
       throw new Error('path outside the repository');
   }
 
-  orca.panels.handle('repos.fetch', async () => {
-    const t0 = Date.now();
-    const { root } = await resolveRoot(orca);
-    const names = await repoNames(root);
-    const results: FetchResult[] = await Promise.all(
-      names.map((name) =>
-        git(join(root, name), ['fetch', '--quiet', '--no-tags'], 120_000, fetchSlot).then(
-          () => ({ name }),
-          (e: Error) => ({ name, error: gitErrorLine(String(e.message)) }),
-        ),
-      ),
-    );
+  orca.panels.handle('repo.fetch', async ({ path }) => {
+    await assertRepo(path);
+    try {
+      await git(path, ['fetch', '--quiet', '--no-tags'], 120_000, fetchSlot);
+    } catch (e) {
+      return { error: gitErrorLine(String((e as Error).message)) };
+    }
     void updateStatusBar();
-    return { total: names.length, results, tookMs: Date.now() - t0 };
+    return {};
   });
 
   async function scanRepos(): Promise<{

@@ -91,14 +91,10 @@ declare module 'orca' {
       input: { repoPath: string; file: string };
       output: { opened: boolean };
     };
-    /** Scrive su .git (refs remoti): solo su azione esplicita dell'utente. */
-    'repos.fetch': {
-      output: {
-        total: number;
-        /** Un esito per repo, nell'ordine di scansione; `error` assente = riuscito. */
-        results: FetchResult[];
-        tookMs: number;
-      };
+    /** Scrive su .git (refs remoti): solo su azione esplicita dell'utente. Un repo per richiesta. */
+    'repo.fetch': {
+      input: { path: string };
+      output: { error?: string };
     };
     'file.diff': {
       input: { path: string; file: string; group: FileGroup };

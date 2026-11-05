@@ -14,6 +14,7 @@ import type {
   ChangedFile,
   FileCommit,
   FileEntry,
+  FetchResult,
   FileGroup,
   GraphCommit,
   RepoStatus,
@@ -85,6 +86,8 @@ const S = {
   tookMs: 0,
   failure: null as string | null,
   note: '',
+  /** Percorsi dei repo con un fetch in corso (spinner sulla riga). */
+  fetching: new Set<string>(),
   onlyDirty: false,
   tab: 'changes' as Tab,
   selected: null as string | null,
@@ -241,6 +244,8 @@ async function refresh(): Promise<void> {
 async function refreshOnce(): Promise<void> {
   try {
     const a = await req('repos.list');
+    // Gruppo diverso (cambio workspace): note e fetch del gruppo precedente non valgono più.
+    if (S.root && S.root !== a.root) S.note = '';
     S.repos = a.repos;
     S.root = a.root;
     S.source = a.source;
@@ -504,15 +509,52 @@ async function openRepo(repo: RepoStatus): Promise<void> {
   }
 }
 
-/** Il worker fa fetch a 3 alla volta, 120 s al massimo ciascuno: la richiesta non può durare meno. */
-const FETCH_ALL_TIMEOUT_MS = 600_000;
+/** Fetch contemporanei (come la coda del worker) e tetto per singolo repo: il timer parte solo a fetch avviato. */
+const FETCH_PARALLEL = 3;
+const NOTE_OK_MS = 8_000;
+const FETCH_TIMEOUT_MS = 130_000;
 
 async function fetchAll(): Promise<void> {
+  if (S.fetching.size) return;
+  const repos = [...S.repos];
+  const t0 = Date.now();
+  const results: FetchResult[] = [];
+  const queue = [...repos];
   S.note = t('fetchRunning');
+  S.fetching = new Set();
   render();
-  const r = await call('Fetch', 'repos.fetch', undefined, FETCH_ALL_TIMEOUT_MS);
-  if (r) {
-    S.note = fetchReport(r.results, r.tookMs, t);
+  const worker = async (): Promise<void> => {
+    for (let r = queue.shift(); r; r = queue.shift()) {
+      S.fetching.add(r.path);
+      render();
+      try {
+        const o = await req('repo.fetch', { path: r.path }, FETCH_TIMEOUT_MS);
+        results.push({ name: r.name, error: o.error });
+      } catch (e) {
+        results.push({ name: r.name, error: msg(e) });
+      } finally {
+        S.fetching.delete(r.path);
+        render();
+      }
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: FETCH_PARALLEL }, worker));
+    const report = fetchReport(results, Date.now() - t0, t);
+    S.note = report;
+    // Esito tutto ok: sparisce da solo; con errori resta finché non si clicca.
+    if (!results.some((x) => x.error)) {
+      setTimeout(() => {
+        if (S.note === report) {
+          S.note = '';
+          render();
+        }
+      }, NOTE_OK_MS);
+    }
+  } catch (e) {
+    S.note = `Fetch: ${msg(e)}`;
+  } finally {
+    S.fetching = new Set();
   }
   await refresh();
 }
@@ -612,7 +654,9 @@ function repoRow(r: RepoStatus): HTMLElement {
     h(
       'div',
       { class: 'title frow' },
-      h('span', { class: `dot d-${state}` }),
+      S.fetching.has(r.path)
+        ? h('span', { class: 'spin', title: t('fetchRunning') })
+        : h('span', { class: `dot d-${state}` }),
       h('span', { class: 'fname' }, r.name),
       arrows,
     ),
@@ -1389,7 +1433,19 @@ function render(): void {
       t('onlyDirty'),
     ),
     S.failure && h('div', { class: 'note err' }, S.failure),
-    S.note && h('div', { class: 'note warn' }, S.note),
+    S.note &&
+      h(
+        'div',
+        {
+          class: 'note warn',
+          title: t('tipDismiss'),
+          onclick: () => {
+            S.note = '';
+            render();
+          },
+        },
+        S.note,
+      ),
     viewRepos(),
     h('hr'),
     viewDetail(),
@@ -1467,7 +1523,7 @@ hr { width:100%; border:0; border-top:1px solid var(--line); margin:2px 0 }
 .title { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .desc { font-size:11.5px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .repo { padding-top:6px; padding-bottom:6px } .repo .desc { margin-top:2px; gap:6px }
-.dot { flex:none; width:8px; height:8px; border-radius:50% } .d-ok { background:#73c991 } .d-warn { background:#e2c08d } .d-info { background:#6cb6ff }
+.dot { flex:none; width:8px; height:8px; border-radius:50% } .spin { flex:none; width:8px; height:8px; box-sizing:border-box; border-radius:50%; border:1.5px solid color-mix(in srgb, var(--orca-foreground) 25%, transparent); border-top-color:var(--orca-foreground); animation:spin .8s linear infinite } @keyframes spin { to { transform:rotate(360deg) } } .d-ok { background:#73c991 } .d-warn { background:#e2c08d } .d-info { background:#6cb6ff }
 .d-danger { background:#f0705f } .d-err { background:transparent; border:1.5px solid #f0705f; box-sizing:border-box }
 .arrows { flex:none; font:11.5px ui-monospace,monospace; color:var(--dim) } .branch { color:var(--orca-foreground); opacity:.85 }
 .err-text { color:var(--c-danger) }
