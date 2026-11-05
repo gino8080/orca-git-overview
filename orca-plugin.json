@@ -15,7 +15,7 @@
       "caption": "Every repo of the folder, plus graph and commit detail"
     }
   ],
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "See every git repo of a multi-repo folder in one panel: dirty files, ahead/behind, branches and fetch-all. Complements Orca Source Control.",
   "repository": "https://github.com/gino8080/orca-git-overview",
   "engines": {
