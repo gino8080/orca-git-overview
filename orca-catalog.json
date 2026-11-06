@@ -16,6 +16,73 @@
       ],
       "releases": [
         {
+          "version": "0.1.6",
+          "commit": "90d5b6be1e8278a68a19e8f64e2f7ec8d33f008d",
+          "contentHash": "226473485491db48071b205dbf700a543810246e1ac4020e21099fc36a492077",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Multi-Repo Git Overview",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "Git Overview"
+            },
+            {
+              "kind": "customEditors",
+              "name": "Git Diff",
+              "detail": ".gitdiff"
+            },
+            {
+              "kind": "statusBarItems",
+              "name": "Git Overview"
+            }
+          ],
+          "capabilities": [
+            "storage:own",
+            "workspace:read",
+            "workspace:write",
+            "settings:own"
+          ],
+          "fileTypes": [
+            "gitdiff"
+          ],
+          "editorFileTypes": [
+            "gitdiff"
+          ],
+          "images": {
+            "icon": {
+              "path": "assets/icon.png",
+              "alt": "Multi-Repo Git Overview",
+              "sha256": "5d3725cbb02cacde4468d7e2a3711861b2b1fd24740743d7ab6eda5c250b4c44",
+              "width": 512,
+              "height": 512
+            },
+            "cover": {
+              "path": "assets/cover.png",
+              "alt": "Multi-Repo Git Overview: every repository of a folder in one panel, with pending changes, ahead/behind and branch mismatches",
+              "sha256": "87a9b6a09719fe696971915c870126499d227f95a784bd06eba132fcc88f9a9e",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "assets/screenshot-overview.png",
+                "alt": "Summary bar (5 repos, 3 with changes, 1 behind, 1 ahead, on 2 branches) above the list of five repositories and one repo's staged file",
+                "sha256": "57521e2cbb8bfeb4bac49e5bae66773e3f34375db42ae271ff0b49f1ba7a4eff",
+                "width": 1402,
+                "height": 876
+              },
+              {
+                "path": "assets/screenshot-graph.png",
+                "alt": "The same panel with the commit graph of one repository and the files changed by the selected commit",
+                "sha256": "3b50247c329489f1e6cb8a09f68b0dd0a8af7579e03422f93d0c228daad62956",
+                "width": 1402,
+                "height": 1050
+              }
+            ]
+          }
+        },
+        {
           "version": "0.1.5",
           "commit": "d11f5271438d22ddb947ab2e268e8af7c81cd440",
           "contentHash": "96ece71b06e6871bb6810d47eb40dda5d030889d3fbad4e56b58d78eaf14ebd9",
