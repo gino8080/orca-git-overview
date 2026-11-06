@@ -18,7 +18,7 @@ import type { DiffPayload } from '../shared/diff';
 import { createLimiter, unquoteC } from '../shared/gitutil';
 import { makeT, resolveLang, type Translate } from '../shared/i18n';
 import { statusBarState, summarize } from '../shared/summary';
-import { pickWorkspace } from '../shared/workspace';
+import { pickWorkspace, type WsPick } from '../shared/workspace';
 import type {
   Branch,
   ChangedFile,
@@ -226,23 +226,30 @@ async function terminalPaths(terminals: { id: string }[]): Promise<string[]> {
   }
 }
 
+/** Riconosce il workspace attivo (nome + branch, poi terminali per gli omonimi). */
+async function pickActive(orca: OrcaWorkerApi): Promise<WsPick<Ws>> {
+  const ctx = (await orca.host.call('workspace.readContext', {})) as {
+    displayName: string;
+    branch: string;
+    terminals: { id: string }[];
+  } | null;
+  const { workspaces } = (await orca.host.call('workspace.list', {})) as {
+    workspaces: Ws[];
+  };
+  if (!ctx) return { kind: 'none' };
+  const pick = pickWorkspace(workspaces, ctx, []);
+  return pick.kind === 'ambiguous'
+    ? pickWorkspace(workspaces, ctx, await terminalPaths(ctx.terminals))
+    : pick;
+}
+
 /** Cartella da scansionare: figli-repo del workspace attivo, altrimenti il setting rootDir. */
 async function resolveRoot(
   orca: OrcaWorkerApi,
 ): Promise<{ root: string; source: string }> {
   const fallback = String((await orca.settings.get('rootDir')) ?? '');
   try {
-    const ctx = (await orca.host.call('workspace.readContext', {})) as {
-      displayName: string;
-      branch: string;
-      terminals: { id: string }[];
-    } | null;
-    const { workspaces } = (await orca.host.call('workspace.list', {})) as {
-      workspaces: Ws[];
-    };
-    let pick = ctx ? pickWorkspace(workspaces, ctx, []) : ({ kind: 'none' } as const);
-    if (ctx && pick.kind === 'ambiguous')
-      pick = pickWorkspace(workspaces, ctx, await terminalPaths(ctx.terminals));
+    const pick = await pickActive(orca);
     if (pick.kind === 'ambiguous') return { root: fallback, source: 'ambiguous' };
     const ws = pick.kind === 'found' ? pick.ws : undefined;
     if (ws) {
@@ -690,8 +697,17 @@ export default function activate(orca: OrcaWorkerApi): void {
     return m;
   }
 
-  /** Workspace del repo: quello con lo stesso path, altrimenti il più profondo che lo contiene (repo in sottocartella). */
+  /**
+   * Workspace in cui aprire il file del repo: prima quello attivo se contiene il repo (nessun
+   * cambio di workspace: l'utente resta dov'è), altrimenti quello con lo stesso path o il più
+   * profondo che lo contiene.
+   */
   async function findWorkspace(path: string): Promise<WsMatch | null> {
+    const active = await pickActive(orca).catch(() => null);
+    if (active?.kind === 'found') {
+      const r = relative(active.ws.path, path);
+      if (!r.startsWith('..') && !isAbsolute(r)) return { ws: active.ws, rel: r };
+    }
     const { workspaces } = (await orca.host.call('workspace.list', {})) as {
       workspaces: Ws[];
     };
