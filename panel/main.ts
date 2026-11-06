@@ -402,7 +402,7 @@ async function selectCommit(repoPath: string, c: GraphCommit): Promise<void> {
   render();
 }
 
-/** Apre il diff nel tab centrale "anteprima" del workspace del repo (un solo tab, riusato). */
+/** Apre il diff nel tab centrale del workspace, titolato `<nome-file>.gitdiff` (riusato per lo stesso nome). */
 async function previewDiff(
   repo: RepoStatus,
   input: { file: string; group: FileGroup; hash?: string; origFile?: string },

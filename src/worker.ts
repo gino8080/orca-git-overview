@@ -11,7 +11,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { delimiter, isAbsolute, join, relative, sep } from 'node:path';
+import { basename, delimiter, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type { OrcaWorkerApi } from 'orca/worker';
 import type { DiffPayload } from '../shared/diff';
@@ -742,9 +742,13 @@ export default function activate(orca: OrcaWorkerApi): void {
     return cappedDiff(path, diffArgs(file, group));
   });
 
-  /** Nome fisso: un solo tab "anteprima" per repo, riusato (e aggiornato) a ogni diff. */
-  const PREVIEW = 'anteprima.gitdiff';
+  /**
+   * Orca titola il tab col nome del file: `<nome-file>.gitdiff`, così il tab dice quale file si
+   * guarda. Lo stesso nome file nel repo riusa (e aggiorna) il tab; file diversi aprono tab diversi.
+   */
+  const previewName = (file: string): string => `${basename(file)}.gitdiff`;
   const PREVIEW_DIR = '.orca-overview';
+  const MAX_PREVIEWS = 20;
 
   /** Aggiunge `pattern` a `.git/info/exclude` (solo locale, mai versionato) se manca. */
   async function excludeFromGit(gitDir: string, pattern: string): Promise<void> {
@@ -756,6 +760,18 @@ export default function activate(orca: OrcaWorkerApi): void {
       file,
       `${current && !current.endsWith('\n') ? '\n' : ''}${pattern}\n`,
     );
+  }
+
+  /** Tiene gli ultimi `MAX_PREVIEWS` file `.gitdiff` (per data di modifica) e rimuove gli altri. */
+  async function pruneOldPreviews(dir: string): Promise<void> {
+    const found: { path: string; mtime: number }[] = [];
+    for (const f of await readdir(dir)) {
+      if (!f.endsWith('.gitdiff')) continue;
+      const st = await lstat(join(dir, f)).catch(() => null);
+      if (st?.isFile()) found.push({ path: join(dir, f), mtime: st.mtimeMs });
+    }
+    found.sort((a, b) => b.mtime - a.mtime);
+    for (const old of found.slice(MAX_PREVIEWS)) await rm(old.path, { force: true });
   }
 
   /** Scrive il diff nel file di anteprima e lo apre nel tab centrale del workspace del repo. */
@@ -778,12 +794,13 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (!dirStat) await mkdir(dir, { recursive: true });
     // Temporanei lasciati da un rename fallito (antivirus su Windows, disco pieno): oltre 1 h si tolgono.
     for (const f of await readdir(dir)) {
-      if (!f.startsWith(`${PREVIEW}.`) || !f.endsWith('.tmp')) continue;
+      if (!f.includes('.gitdiff.') || !f.endsWith('.tmp')) continue;
       const st = await lstat(join(dir, f)).catch(() => null);
       if (st && Date.now() - st.mtimeMs > 3_600_000)
         await rm(join(dir, f), { force: true });
     }
-    const file = join(dir, PREVIEW);
+    const name = previewName(payload.file);
+    const file = join(dir, name);
     const fileStat = await lstat(file).catch(() => null);
     if (fileStat && !fileStat.isFile())
       return { opened: false, reason: 'preview-dir-unsafe' };
@@ -795,7 +812,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     // File temporaneo + rename: sostituisce la voce invece di seguire un eventuale symlink.
     const tmp = join(
       dir,
-      `${PREVIEW}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
+      `${name}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`,
     );
     try {
       await writeFile(tmp, JSON.stringify({ ...payload, lang }), { flag: 'wx' });
@@ -804,10 +821,11 @@ export default function activate(orca: OrcaWorkerApi): void {
       await rm(tmp, { force: true });
       throw e;
     }
+    await pruneOldPreviews(dir).catch(() => undefined); // mai fatale: il diff è già scritto
     await orca.host.call('workspace.open', { workspaceId: m.ws.id });
     await orca.host.call('editor.open', {
       workspaceId: m.ws.id,
-      path: inWorkspace(m, `${PREVIEW_DIR}/${PREVIEW}`),
+      path: inWorkspace(m, `${PREVIEW_DIR}/${name}`),
     });
     return { opened: true };
   }

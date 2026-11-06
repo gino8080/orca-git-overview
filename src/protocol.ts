@@ -101,7 +101,7 @@ declare module 'orca' {
       output: { diff: string; truncated: boolean };
     };
     /**
-     * Scrive `.orca-overview/anteprima.gitdiff` (esclusa via `.git/info/exclude`) (nome fisso, un tab riusato) e lo apre nel tab centrale.
+     * Scrive `.orca-overview/<nome-file>.gitdiff` (esclusa via `.git/info/exclude`; stesso nome file = tab riusato) e lo apre nel tab centrale.
      * Con `hash` mostra il diff del file in quel commit (`origFile` per le rinomine), altrimenti quello del working tree.
      */
     'file.diff.open': {

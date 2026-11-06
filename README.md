@@ -20,7 +20,7 @@ stage, commit or discard anything.
 
 - **Repositories**: branch, ahead/behind, staged / modified / untracked / conflict counts, stash, last commit. Optional "only dirty" filter.
 - **Changes**: file list (flat or tree) with status letters and +/- line counts. Clicking a file opens its diff in a central tab.
-- **Diff**: side-by-side diff in a single reused editor tab (`anteprima.gitdiff`), for working-tree changes, commits and file history. A native Orca diff is available too.
+- **Diff**: side-by-side diff in an editor tab named after the file (`<file name>.gitdiff`, reused when you reopen the same file), for working-tree changes, commits and file history. A native Orca diff is available too.
 - **File history**: commits that touched a file, following renames.
 - **Branches**: local and remote. Switch branch (never forced) and Fetch run only from an explicit button.
 - **Graph**: commit graph with lanes, branch/tag chips, commit detail and per-file diff. Resizable split between list and detail.
@@ -53,7 +53,7 @@ The plugin runs as a `trusted-worker`: its worker has your user's access and exe
 the native diff, the `orca` CLI). Every request is validated: repositories must be children of the scanned
 folder, file paths must be relative without `..`, commit hashes must be hexadecimal, and untracked files
 cannot be read through symlinks that leave the repository. Temporary diff files are written to
-`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never versioned) and overwritten at every preview. Git's local exclude is not a `.gitignore`: tools that only read `.gitignore` (`npm pack`, Docker build contexts, rsync, zip) will include `.orca-overview/anteprima.gitdiff`, which holds the last diff you opened, so delete the folder before packaging a repository. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
+`.orca-overview/` in the repository (excluded locally through `.git/info/exclude`, never versioned) and overwritten at every preview. Git's local exclude is not a `.gitignore`: tools that only read `.gitignore` (`npm pack`, Docker build contexts, rsync, zip) will include the `.orca-overview/*.gitdiff` files, which hold the diffs you opened, so delete the folder before packaging a repository. It cannot live inside `.git`: Orca's file watcher ignores that folder, so an open diff tab would not refresh.
 
 **Trust model.** The plugin assumes the *tracked content* of a repository can be hostile, not its `.git` folder. Background reads run `git` with `core.fsmonitor=false`, `color.ui=never`, no optional index locks and no external diff or textconv drivers. The explicit **Fetch** and **Switch** actions are different: they run `git` with the repository's own configuration (`core.sshCommand`, credential helpers, hooks such as `post-checkout`), exactly as if you ran them in a terminal. Do not use them on repositories whose `.git` you received from someone you do not trust.
 

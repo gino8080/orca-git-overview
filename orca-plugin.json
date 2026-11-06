@@ -20,7 +20,7 @@
       "caption": "Drill into any repo: commit graph and per-commit files"
     }
   ],
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "MIT",
   "description": "Folder with several git repos and no shared .git? See which have pending changes, are behind their remote or sit on a different branch, and fetch them all in one click.",
   "repository": "https://github.com/gino8080/orca-git-overview",
