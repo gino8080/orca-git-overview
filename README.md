@@ -9,6 +9,17 @@ This plugin puts **every repository inside the active workspace folder** in one 
 of [Orca](https://github.com/stablyai/orca): status at a glance, a summary ("3 with changes",
 "on 2 different branches") and a single **Fetch** for all of them.
 
+## What it covers, and what it does not
+
+| Your setup | Use |
+| --- | --- |
+| A folder whose sub-folders are **independent git repositories** (each with its own `.git`, no `.git` in the parent) | **This plugin.** It finds them by scanning the folder. |
+| A folder workspace with **worktrees attached in Orca** | Orca's native Source Control, which builds its per-repo cards from attached-worktree lineage and never scans the disk. |
+| A single repository | Orca's native Source Control. |
+
+The plugin does not manage worktrees and does not list worktrees you attached in Orca. It reads plain
+sub-repositories straight from disk.
+
 ## How it relates to Orca's Source Control
 
 It **complements** the native Source Control view and does not replace it (Orca's plugin API has no
