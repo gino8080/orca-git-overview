@@ -16,9 +16,9 @@
       ],
       "releases": [
         {
-          "version": "0.1.9",
-          "commit": "a36f0e2ae4ba551a98d1472eb67f576b28d8f153",
-          "contentHash": "36a9f3870b1041f052da0aaa5f37052e147ae398a7c9226a895f9c7de192b816",
+          "version": "0.1.10",
+          "commit": "63fe974bf3fe990144934013ef6bcb426bf1b8ae",
+          "contentHash": "e11c52bea52e70b2547b30cd270a68a7240d119f719b088a8bda291388c295cd",
           "execution": "trusted-worker",
           "minimumOrca": "1.4.248",
           "name": "Multi-Repo Git Overview",
