@@ -14,7 +14,7 @@
       "caption": "All the repos of a folder at once: pending changes, ahead/behind, branch, and the history of the one you pick"
     }
   ],
-  "version": "0.1.9",
+  "version": "0.1.10",
   "license": "MIT",
   "description": "For a folder of independent git repos, each with its own .git and no shared parent. See which have pending changes, are behind their remote or sit on a different branch, and fetch them all in one click. Orca's native Source Control covers attached worktrees; this covers plain sub-repos.",
   "repository": "https://github.com/gino8080/orca-git-overview",
