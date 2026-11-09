@@ -10,15 +10,15 @@
         "url": "https://github.com/gino8080/orca-git-overview.git",
         "ref": "main"
       },
-      "description": "Folder with several git repos and no shared .git? See which have pending changes, are behind their remote or sit on a different branch, and fetch them all in one click.",
+      "description": "For a folder of independent git repos, each with its own .git and no shared parent. See which have pending changes, are behind their remote or sit on a different branch, and fetch them all in one click. Orca's native Source Control covers attached worktrees; this covers plain sub-repos.",
       "categories": [
         "git"
       ],
       "releases": [
         {
-          "version": "0.1.7",
-          "commit": "49c77d30459cbff105d02a18d702815ee5f16c96",
-          "contentHash": "158171aaa2484830d6a90e949dfec7764e4a53b6f21e8d14e473d4c82c84671c",
+          "version": "0.1.8",
+          "commit": "f100096e093f443282acf7c246daf6f48de35dbd",
+          "contentHash": "5ca773098efa9c08f85eb2477bb5af699fda491872e8b806d1cc921cfc921da3",
           "execution": "trusted-worker",
           "minimumOrca": "1.4.248",
           "name": "Multi-Repo Git Overview",
