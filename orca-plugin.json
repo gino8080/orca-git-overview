@@ -1,7 +1,6 @@
 {
   "manifestVersion": 2,
   "id": "git-overview",
-  "publisher": "gino8080",
   "name": "Multi-Repo Git Overview",
   "icon": "assets/icon.png",
   "cover": {
@@ -11,16 +10,11 @@
   "screenshots": [
     {
       "path": "assets/screenshot-overview.png",
-      "alt": "Summary bar (5 repos, 3 with changes, 1 behind, 1 ahead, on 2 branches) above the list of five repositories and one repo's staged file",
-      "caption": "Which repos have pending work, are behind or sit on another branch"
-    },
-    {
-      "path": "assets/screenshot-graph.png",
-      "alt": "The same panel with the commit graph of one repository and the files changed by the selected commit",
-      "caption": "Drill into any repo: commit graph and per-commit files"
+      "alt": "Summary bar (5 repos, 3 with changes, 1 behind, 1 ahead) over the five repos, with the commit graph and a commit's files of the selected repo",
+      "caption": "All the repos of a folder at once: pending changes, ahead/behind, branch, and the history of the one you pick"
     }
   ],
-  "version": "0.1.8",
+  "version": "0.1.9",
   "license": "MIT",
   "description": "For a folder of independent git repos, each with its own .git and no shared parent. See which have pending changes, are behind their remote or sit on a different branch, and fetch them all in one click. Orca's native Source Control covers attached worktrees; this covers plain sub-repos.",
   "repository": "https://github.com/gino8080/orca-git-overview",
